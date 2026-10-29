@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {capacity,defaults} from './capacity.mjs';
+const base=capacity();
+assert.equal(base.monthly,100);
+assert.equal(base.recommended,2);
+assert.ok(Math.abs(base.utilization-28.7687002301)<0.001);
+const high=capacity({...defaults,units:500,dogShare:35,baths:1.5,peakShare:80,availability:80});
+assert.equal(high.monthly,262.5);
+assert.equal(high.recommended,3);
+assert.ok(high.utilization>110);
+assert.equal(capacity({...defaults,units:500,dogShare:35,baths:1.5,peakShare:80,availability:80,cycle:60}).recommended,4);
+assert.ok(capacity({units:500}).monthly>capacity({units:300}).monthly);
+assert.ok(capacity({availability:70}).utilization>capacity({availability:90}).utilization);
+assert.throws(()=>capacity({peakHours:0}),RangeError);
+assert.throws(()=>capacity({dogShare:101}),RangeError);
+console.log('Capacity: base, stress, monotonicity and invalid-input checks passed.');

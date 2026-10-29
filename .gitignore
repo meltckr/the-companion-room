@@ -1,0 +1,11 @@
+archive/
+evidence/
+dist/
+*.blend
+*.blend1
+*.zip
+Open-The-Companion-Room.html
+__pycache__/
+.DS_Store
+
+.release-source
