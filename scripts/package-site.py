@@ -6,11 +6,11 @@ dist=root/'dist'
 dist.mkdir(exist_ok=True)
 for name in ['index.html','style.css','app.mjs','capacity.mjs','model.js','panorama.js','master-loader.mjs','The-Companion-Room-Concept-Brief.pdf','Developer-Decision-Brief.pdf','Procurement-Scope.pdf']:
     shutil.copy2(root/name,dist/name)
-(dist/'assets/master').mkdir(parents=True,exist_ok=True)
-for name in ['companion-room-og-v3.jpg','companion-room-icon-32.png','companion-room-icon-180.png']:
+(dist/'assets/master-v4').mkdir(parents=True,exist_ok=True)
+for name in ['companion-room-og-v3.jpg','companion-room-og-v4.jpg','companion-room-icon-32.png','companion-room-icon-180.png']:
     shutil.copy2(root/'assets'/name,dist/'assets'/name)
-for name in ['entrance.jpg','wash.jpg','dry.jpg','hero.jpg','hero.webp','detail.webp','scene.bin','scene.bin.gz','scene-meta.json','entrance-mobile.jpg','wash-mobile.jpg','dry-mobile.jpg']:
-    shutil.copy2(root/'assets/master'/name,dist/'assets/master'/name)
+for name in ['lighting.png','reflections.jpg','oak.jpg','stone.jpg','entrance.jpg','wash.jpg','dry.jpg','hero.jpg','hero.webp','detail.webp','scene.bin','scene.bin.gz','scene-meta.json','entrance-mobile.jpg','wash-mobile.jpg','dry-mobile.jpg']:
+    shutil.copy2(root/'assets/master-v4'/name,dist/'assets/master-v4'/name)
 (dist/'.nojekyll').write_text('')
 print('Static release packaged in dist/.')
 
@@ -20,3 +20,9 @@ for name in ['spa-hero-v2.webp','spa-detail-v2.webp','companion-room-og.jpg']:
     shutil.copy2(root/'assets'/name,dist/'assets'/name)
 for name in ['entrance.jpg','wash.jpg','dry.jpg','hero.jpg']:
     shutil.copy2(root/'assets/cinematic'/name,dist/'assets/cinematic'/name)
+
+# Preserve the previous scene asset URLs for cached Concept 03 presentations.
+(dist/'assets/master').mkdir(parents=True,exist_ok=True)
+for file in (root/'assets/master').iterdir():
+    if file.is_file() and file.suffix not in ('.blend','.blend1'):
+        shutil.copy2(file,dist/'assets/master'/file.name)

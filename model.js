@@ -169,24 +169,132 @@ export function createSpaViewer(canvas, options = {}) {
   group='all';
   const scenePoints=options.geometry?.vertices||points;
   const sceneItems=options.geometry?.items||items;
-  canvas.dataset.vertexCount=String(scenePoints.length/11);
+  const stride=options.geometry?.stride||11;
+  if(stride!==11&&stride!==12&&stride!==14)throw new Error(`Unsupported scene vertex stride: ${stride}`);
+  canvas.dataset.vertexCount=String(scenePoints.length/stride);
   canvas.dataset.drawGroups=String(sceneItems.length);
   const vs = `#version 300 es
-  precision highp float; layout(location=0) in vec3 aPosition; layout(location=1) in vec3 aNormal; layout(location=2) in vec3 aColor; layout(location=3) in float aRough; layout(location=4) in float aKind;
-  uniform mat4 uVP;uniform mat4 uLight;out vec3 vWorld;out vec3 vNormal;out vec3 vColor;out float vRough;out float vKind;out vec4 vShadow;
-  void main(){vWorld=aPosition;vNormal=aNormal;vColor=aColor;vRough=aRough;vKind=aKind;vShadow=uLight*vec4(aPosition,1.);gl_Position=uVP*vec4(aPosition,1.);}`;
+  precision highp float; layout(location=0) in vec3 aPosition; layout(location=1) in vec3 aNormal; layout(location=2) in vec3 aColor; layout(location=3) in float aRough; layout(location=4) in float aKind;layout(location=5) in float aAO;layout(location=6) in vec2 aLightUV;
+  uniform mat4 uVP;uniform mat4 uLight;out vec3 vWorld;out vec3 vNormal;out vec3 vColor;out float vRough;out float vKind;out float vAO;out vec2 vLightUV;out vec4 vShadow;
+  void main(){vWorld=aPosition;vNormal=aNormal;vColor=aColor;vRough=aRough;vKind=aKind;vAO=aAO;vLightUV=aLightUV;vShadow=uLight*vec4(aPosition,1.);gl_Position=uVP*vec4(aPosition,1.);}`;
   const fs = `#version 300 es
-  precision highp float;in vec3 vWorld;in vec3 vNormal;in vec3 vColor;in float vRough;in float vKind;in vec4 vShadow;uniform vec3 uEye;uniform vec3 uSky;uniform sampler2D uDepth;uniform bool uShadows;out vec4 frag;
-  void main(){vec3 n=normalize(vNormal);vec3 base=vColor;
-    if(vKind>.5&&vKind<1.5){base*=.99+.012*sin(vWorld.x*12.+sin(vWorld.z*9.));}
-    if(vKind>1.5&&vKind<2.5){base*=.94+.055*sin(vWorld.x*75.+sin(vWorld.y*3.)+vWorld.z*4.);}
-    vec3 l=normalize(vec3(-3.,8.,5.));float diffuse=max(dot(n,l),0.);float shadow=0.;vec3 p=vShadow.xyz/vShadow.w*.5+.5;
-    if(uShadows&&p.x>0.&&p.x<1.&&p.y>0.&&p.y<1.&&p.z<1.){float bias=max(.0015*(1.-dot(n,l)),.00065);for(int x=-1;x<=1;x++)for(int y=-1;y<=1;y++){float d=texture(uDepth,p.xy+vec2(x,y)/1536.).r;shadow+=p.z-bias>d?1.:0.;}shadow/=9.;}
-    float hemi=.40+.17*n.y;vec3 light=vec3(hemi*.97,hemi,hemi*.96)+vec3(.59,.52,.41)*diffuse*(1.-shadow*.72);
-    float contact=clamp(vWorld.y/.19,0.,1.);light*=mix(.86,1.,contact);
-    vec3 h=normalize(l+normalize(uEye-vWorld));float spec=pow(max(dot(n,h),0.),mix(90.,8.,vRough))*(1.-vRough)*.5*(1.-shadow*.6);
-    float fresnel=pow(1.-max(dot(n,normalize(uEye-vWorld)),0.),5.);vec3 c=base*light+vec3(spec)+vec3(.16,.17,.16)*fresnel*(1.-vRough);if(vKind>3.5&&vKind<4.5)c=mix(c,uSky,.65);if(vKind>4.5)c=base*1.25;
-    c=mix(c,vec3(.91,.91,.86),clamp(length(uEye-vWorld)/65.,0.,.14));frag=vec4(pow(c,vec3(.94)),1.);}`;
+  precision highp float;
+  in vec3 vWorld;in vec3 vNormal;in vec3 vColor;in float vRough;in float vKind;in float vAO;in vec2 vLightUV;in vec4 vShadow;
+  uniform vec3 uEye;uniform vec3 uSky;uniform sampler2D uDepth;uniform sampler2D uReflection;uniform bool uReflectionsReady;uniform sampler2D uLightmap;uniform bool uLightingReady;uniform sampler2D uOak;uniform sampler2D uStone;uniform vec2 uMaterialReady;uniform bool uShadows;out vec4 frag;
+  float hash(vec3 p){p=fract(p*.1031);p+=dot(p,p.yzx+33.33);return fract((p.x+p.y)*p.z);}
+  float noise(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1)),f.x),f.y),f.z);}
+  vec3 stoneSample(vec2 uv){
+    vec2 tileInterior=vec2(.18,.18);
+    return textureGrad(uStone,vec2(.49,.24)+fract(uv)*tileInterior,dFdx(uv)*tileInterior,dFdy(uv)*tileInterior).rgb;
+  }
+  vec3 surfacePhoto(vec3 n,bool wood){
+    vec3 weights=pow(abs(n),vec3(8.));weights/=max(dot(weights,vec3(1.)),.0001);
+    if(wood){
+      // Side faces keep grain upright. Horizontal slabs run grain along their X axis.
+      vec3 x=texture(uOak,vWorld.zy*vec2(.82,.58)).rgb;
+      vec3 y=texture(uOak,vWorld.zx*vec2(.82,.58)).rgb;
+      vec3 z=texture(uOak,vWorld.xy*vec2(.82,.58)).rgb;
+      return x*weights.x+y*weights.y+z*weights.z;
+    }
+    return stoneSample(vWorld.zy*.65)*weights.x+stoneSample(vWorld.xz*.65)*weights.y+stoneSample(vWorld.xy*.65)*weights.z;
+  }
+  float softShadow(vec3 n,vec3 l){
+    vec3 p=vShadow.xyz/vShadow.w*.5+.5;
+    if(!uShadows||p.x<=0.||p.x>=1.||p.y<=0.||p.y>=1.||p.z>=1.||p.z<=0.)return 1.;
+    float bias=max(.0012*(1.-dot(n,l)),.00038),blocked=0.;
+    for(int x=0;x<4;x++)for(int y=0;y<4;y++){
+      vec2 offset=(vec2(x,y)-1.5)*1.65/1536.;
+      blocked+=step(texture(uDepth,p.xy+offset).r,p.z-bias);
+    }
+    return 1.-blocked/16.;
+  }
+  // A compact microfacet highlight; broad source lobes keep steel from looking plastic.
+  vec3 lightBRDF(vec3 n,vec3 v,vec3 l,vec3 base,float rough,float metal,vec3 radiance){
+    float nl=max(dot(n,l),0.),nv=max(dot(n,v),.001);vec3 h=normalize(v+l);
+    float nh=max(dot(n,h),0.),vh=max(dot(v,h),0.);
+    float a=max(.075,rough*rough),a2=a*a,d=nh*nh*(a2-1.)+1.;
+    float distribution=a2/(3.14159*d*d);
+    float k=(rough+1.)*(rough+1.)*.125;
+    float geometry=(nv/(nv*(1.-k)+k))*(nl/(nl*(1.-k)+k));
+    vec3 f0=mix(vec3(.04),base,metal),f=f0+(1.-f0)*pow(1.-vh,5.);
+    vec3 spec=distribution*geometry*f/max(4.*nv*nl,.001);
+    return ((1.-f)*(1.-metal)*base/3.14159+spec)*radiance*nl;
+  }
+  void main(){
+    vec3 n=normalize(vNormal),v=normalize(uEye-vWorld),base=vColor;
+    float rough=clamp(vRough,.12,.96);
+    float detail=1.-smoothstep(.025,.13,length(fwidth(vWorld)));
+    float broad=noise(vWorld*2.7),fine=noise(vWorld*95.);
+    if((vKind>.5&&vKind<1.5)||(vKind<.5&&vRough>.46&&vRough<.7&&min(base.r,min(base.g,base.b))>.5)){
+      if(uMaterialReady.y>.5){
+        vec3 photo=surfacePhoto(n,false);
+        float luminance=dot(photo,vec3(.2126,.7152,.0722));
+        base*=clamp(luminance/.72,.62,1.18);
+      }
+      float vein=sin(vWorld.x*3.3+vWorld.z*2.1+broad*5.);
+      base*=.965+.035*broad-.024*pow(abs(vein),12.);
+      rough=clamp(rough+(fine-.5)*.10*detail,.3,.85);
+    }
+    if(vKind>1.5&&vKind<2.5){
+      if(uMaterialReady.x>.5){
+        vec3 photo=surfacePhoto(n,true);
+        base=mix(base,photo*vec3(1.03,1.01,.97),.92);
+      }
+      float along=abs(n.y)>.7?vWorld.z:vWorld.y;
+      float across=abs(n.x)>.7?vWorld.z:vWorld.x;
+      float grain=sin(across*170.+noise(vec3(across*8.,along*.6,0.))*13.);
+      base*=.93+.10*broad+.035*grain*detail;
+      rough=clamp(rough+.055*grain*detail,.32,.7);
+    }
+    if(vKind>2.5&&vKind<3.5)base*=.99+.02*(fine-.5)*detail;
+    // Low-roughness neutral or brass geometry is the exported metal family.
+    float neutralMetal=step(.4,base.r)*(1.-step(.13,max(base.r,max(base.g,base.b))-min(base.r,min(base.g,base.b))));
+    float brassMetal=step(base.b,base.g)*step(base.g,base.r)*step(base.r,base.g*1.4)*step(base.g,base.b*1.8);
+    float metal=vKind<.5?(1.-smoothstep(.35,.46,vRough))*max(neutralMetal,brassMetal)*.88:0.;
+    if(metal>.5){float brushing=sin((vWorld.x+vWorld.z)*740.);rough=clamp(rough+.025*brushing*detail,.18,.5);}
+    vec3 daylight=normalize(vec3(-5.,11.,7.));
+    float visibility=softShadow(n,daylight);
+    float ao=clamp(vAO,.08,1.);
+    float hemi=mix(.31,.57,n.y*.5+.5);
+    vec3 ambient=mix(vec3(.42,.36,.27),vec3(.70,.78,.87),n.y*.5+.5);
+    vec3 c=base*ambient*hemi*mix(.22,1.,ao)*(1.-metal*.68);
+    c+=lightBRDF(n,v,daylight,base,rough,metal,vec3(2.65,2.78,2.86))*(.18+.82*visibility);
+    vec3 ceiling=vec3(.1,3.05,-.6)-vWorld;
+    float ceilingFalloff=1./(1.+dot(ceiling,ceiling)*.095);
+    c+=lightBRDF(n,v,normalize(ceiling),base,max(rough,.28),metal,vec3(2.1,1.55,1.02))*ceilingFalloff*mix(.35,1.,ao);
+    // Warm indirect cove and floor bounce balance the cool window source.
+    float cove=exp(-abs(vWorld.y-2.65)*1.3)*(.5+.5*max(n.y,0.));
+    c+=base*vec3(.22,.14,.075)*cove*ao;
+    c+=base*vec3(.065,.052,.035)*max(-n.y,0.)*ao;
+    vec3 r=reflect(-v,n);
+    vec3 environment=mix(vec3(.16,.13,.095),vec3(.69,.76,.81),smoothstep(-.3,.9,r.y));
+    float windowLobe=pow(max(dot(r,normalize(vec3(-.75,.45,.48))),0.),mix(48.,4.,rough));
+    float strip=pow(max(1.-abs(r.y-.65),0.),mix(65.,9.,rough));
+    environment+=vec3(.82,.91,1.)*windowLobe*.8+vec3(1.,.77,.47)*strip*.25;
+    if(uReflectionsReady){
+      // Panorama centre faces world -Z; image rows are uploaded in top-origin order.
+      vec2 reflectionUV=vec2(.5+atan(r.x,-r.z)/6.2831853,.5-asin(clamp(r.y,-1.,1.))/3.14159265);
+      vec3 encoded=textureLod(uReflection,reflectionUV,rough*5.5).rgb;
+      vec3 room=mix(encoded/12.92,pow((encoded+.055)/1.055,vec3(2.4)),step(vec3(.04045),encoded));
+      environment=mix(environment,room*1.25,.88);
+    }
+    vec3 f0=mix(vec3(.04),base,metal),fresnel=f0+(1.-f0)*pow(1.-max(dot(n,v),0.),5.);
+    c+=environment*fresnel*(1.-rough*.72)*mix(.35,1.,ao);
+    if(uLightingReady&&vLightUV.x>=0.&&vLightUV.y>=0.&&vKind<3.5&&metal<.5){
+      vec3 encoded=texture(uLightmap,vLightUV).rgb;
+      vec3 baked=mix(encoded/12.92,pow((encoded+.055)/1.055,vec3(2.4)),step(vec3(.04045),encoded));
+      // The atlas already contains diffuse color and indirect illumination. Add only view-dependent sheen.
+      vec3 sheen=environment*fresnel*(1.-rough*.72)*.35;
+      sheen+=lightBRDF(n,v,normalize(ceiling),vec3(0.),max(rough,.28),0.,vec3(.45,.34,.23))*ceilingFalloff;
+      c=baked+sheen;
+    }
+    if(vKind>3.5&&vKind<4.5)c=mix(c,uSky,.72)+vec3(.08)*pow(1.-max(dot(n,v),0.),3.);
+    if(vKind>4.5)c=base*1.65;
+    // Gentle highlight compression preserves warm whites without clipping luminaires.
+    c=max(c,vec3(0.));c=c/(vec3(1.)+c*.30);
+    c=pow(c,vec3(1./2.2));
+    frag=vec4(clamp(c,0.,1.),1.);
+  }`;
   function shader(type,source){const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));return s;}
   const resources=[];
   function program(v,f){const p=gl.createProgram(),a=shader(gl.VERTEX_SHADER,v),b=shader(gl.FRAGMENT_SHADER,f);gl.attachShader(p,a);gl.attachShader(p,b);gl.linkProgram(p);gl.deleteShader(a);gl.deleteShader(b);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));resources.push(['program',p]);return p;}
@@ -194,18 +302,100 @@ export function createSpaViewer(canvas, options = {}) {
   try {main=program(vs,fs);depthProgram=program(`#version 300 es\nprecision highp float;layout(location=0) in vec3 aPosition;uniform mat4 uVP;void main(){gl_Position=uVP*vec4(aPosition,1.);}`,`#version 300 es\nprecision highp float;out vec4 frag;void main(){frag=vec4(1.);}`);} catch(error){options.onError?.(error);throw error;}
   const vao=gl.createVertexArray();gl.bindVertexArray(vao);resources.push(['vertexArray',vao]);
   const buffer=gl.createBuffer();resources.push(['buffer',buffer]);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(scenePoints),gl.STATIC_DRAW);
-  for(const [loc,size,offset] of [[0,3,0],[1,3,3],[2,3,6],[3,1,9],[4,1,10]]){gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,size,gl.FLOAT,false,44,offset*4);}
+  for(const [loc,size,offset] of [[0,3,0],[1,3,3],[2,3,6],[3,1,9],[4,1,10]]){gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,size,gl.FLOAT,false,stride*4,offset*4);}
+  if(stride>=12){gl.enableVertexAttribArray(5);gl.vertexAttribPointer(5,1,gl.FLOAT,false,stride*4,44);}else{gl.disableVertexAttribArray(5);gl.vertexAttrib1f(5,1);}
+  if(stride===14){gl.enableVertexAttribArray(6);gl.vertexAttribPointer(6,2,gl.FLOAT,false,stride*4,48);}else{gl.disableVertexAttribArray(6);gl.vertexAttrib2f(6,-1,-1);}
+  let shadowDirty=true;
   const depth=gl.createTexture();resources.push(['texture',depth]);gl.bindTexture(gl.TEXTURE_2D,depth);gl.texImage2D(gl.TEXTURE_2D,0,gl.DEPTH_COMPONENT24,1536,1536,0,gl.DEPTH_COMPONENT,gl.UNSIGNED_INT,null);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
   const fbo=gl.createFramebuffer();resources.push(['framebuffer',fbo]);gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.TEXTURE_2D,depth,0);gl.drawBuffers([gl.NONE]);gl.readBuffer(gl.NONE);const shadows=gl.checkFramebufferStatus(gl.FRAMEBUFFER)===gl.FRAMEBUFFER_COMPLETE;gl.bindFramebuffer(gl.FRAMEBUFFER,null);
-  const uniforms=Object.fromEntries(['uVP','uLight','uEye','uSky','uDepth','uShadows'].map(n=>[n,gl.getUniformLocation(main,n)]));
+  const uniforms=Object.fromEntries(['uVP','uLight','uEye','uSky','uDepth','uShadows','uOak','uStone','uMaterialReady','uLightmap','uLightingReady','uReflection','uReflectionsReady'].map(n=>[n,gl.getUniformLocation(main,n)]));
+  const materialReady=[0,0],materialLoads=[];
+  canvas.dataset.materialsReady='false';
+  const anisotropy=gl.getExtension('EXT_texture_filter_anisotropic');
+  const materialTextures=['oak','stone'].map((name,index)=>{
+    const texture=gl.createTexture();resources.push(['texture',texture]);
+    gl.activeTexture(gl.TEXTURE0+index+1);gl.bindTexture(gl.TEXTURE_2D,texture);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([255,255,255,255]));
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.REPEAT);
+    const image=new Image();materialLoads.push(image);image.crossOrigin='anonymous';
+    image.onload=()=>{
+      if(disposed||gl.isContextLost())return;
+      try{
+        gl.activeTexture(gl.TEXTURE0+index+1);gl.bindTexture(gl.TEXTURE_2D,texture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+        gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,image);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);
+        if(anisotropy)gl.texParameterf(gl.TEXTURE_2D,anisotropy.TEXTURE_MAX_ANISOTROPY_EXT,Math.min(4,gl.getParameter(anisotropy.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
+        materialReady[index]=1;canvas.dataset.materialsReady=String(materialReady.every(Boolean));schedule();
+      }catch{ /* Keep the procedural surface if this device cannot upload the photograph. */ }
+    };
+    image.onerror=()=>{image.onload=image.onerror=null;};
+    image.src=window.ROOM_MATERIALS?.[name]||`assets/master-v4/${name}.jpg`;
+    return texture;
+  });
+  let lightingReady=false;
+  canvas.dataset.lightingReady='false';
+  const lightmap=gl.createTexture();resources.push(['texture',lightmap]);
+  gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,lightmap);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,1,1,0,gl.RGB,gl.UNSIGNED_BYTE,new Uint8Array([255,255,255]));
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  if(stride===14){
+    const image=new Image();materialLoads.push(image);image.crossOrigin='anonymous';
+    image.onload=()=>{
+      if(disposed||gl.isContextLost())return;
+      try{
+        gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,lightmap);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+        gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,image);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);
+        lightingReady=true;canvas.dataset.lightingReady='true';schedule();
+      }catch{gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);}
+    };
+    image.onerror=()=>{image.onload=image.onerror=null;};
+    image.src=window.ROOM_LIGHTMAP||'assets/master-v4/lighting.png';
+  }
+  let reflectionsReady=false;
+  canvas.dataset.reflectionsReady='false';
+  const reflection=gl.createTexture();resources.push(['texture',reflection]);
+  gl.activeTexture(gl.TEXTURE4);gl.bindTexture(gl.TEXTURE_2D,reflection);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,1,1,0,gl.RGB,gl.UNSIGNED_BYTE,new Uint8Array([128,128,128]));
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  {
+    const image=new Image();materialLoads.push(image);image.crossOrigin='anonymous';
+    image.onload=()=>{
+      if(disposed||gl.isContextLost())return;
+      try{
+        gl.activeTexture(gl.TEXTURE4);gl.bindTexture(gl.TEXTURE_2D,reflection);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+        gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,image);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);
+        reflectionsReady=true;canvas.dataset.reflectionsReady='true';schedule();
+      }catch{ /* Synthetic reflection remains available until a room map can upload. */ }
+    };
+    image.onerror=()=>{image.onload=image.onerror=null;};
+    image.src=window.ROOM_REFLECTION||'assets/master-v4/reflections.jpg';
+  }
   const depthVP=gl.getUniformLocation(depthProgram,'uVP');
   const lightVP=multiply(ortho(-6.8,6.8,-6.8,6.8,.1,30),lookAt([-5,11,7],[0,0,0]));
   function visible(item){return !(item.group==='future'&&!future||item.group==='flex'&&future||item.group==='right'&&(view==='overview'||view==='plan')||item.group==='interior'&&(view==='overview'||view==='plan'));}
   function drawItems(){for(const item of sceneItems)if(visible(item))gl.drawArrays(gl.TRIANGLES,item.start,item.count);}
   function camera(){const aspect=canvas.width/canvas.height;if(view==='overview'){const distance=radius*Math.max(1,1.25/aspect);const e=[Math.sin(yaw)*Math.cos(pitch)*distance,Math.sin(pitch)*distance,Math.cos(yaw)*Math.cos(pitch)*distance];return {e,mat:multiply(perspective(.72,aspect,.1,60),lookAt(e,target))};}if(view==='plan'){const span=4.6;const w=aspect>=1?span*aspect:span;const h=aspect>=1?span:span/aspect;return {e:[0,12,0],mat:multiply(ortho(-w,w,-h,h,.1,40),lookAt([0,12,0],[0,0,0],[0,0,-1]))};}const dir=[Math.sin(heading)*Math.cos(tilt),Math.sin(tilt),-Math.cos(heading)*Math.cos(tilt)];return {e:eye,mat:multiply(perspective(1.12,aspect,.06,40),lookAt(eye,add(eye,dir)))};}
   function render(){frame=0;if(disposed)return;const rect=canvas.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,2),w=Math.max(1,Math.round(rect.width*dpr)),h=Math.max(1,Math.round(rect.height*dpr));if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}gl.enable(gl.DEPTH_TEST);gl.disable(gl.CULL_FACE);gl.bindVertexArray(vao);
-    if(shadows){gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);gl.viewport(0,0,1536,1536);gl.clear(gl.DEPTH_BUFFER_BIT);gl.useProgram(depthProgram);gl.uniformMatrix4fv(depthVP,false,lightVP);drawItems();gl.bindFramebuffer(gl.FRAMEBUFFER,null);}
-    gl.viewport(0,0,w,h);gl.clearColor(.895,.899,.87,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(main);const c=camera();gl.uniformMatrix4fv(uniforms.uVP,false,c.mat);gl.uniformMatrix4fv(uniforms.uLight,false,lightVP);gl.uniform3fv(uniforms.uEye,c.e);const skies={winter:[.78,.86,.9],spring:[.7,.82,.69],summer:[.61,.79,.79],fall:[.84,.72,.53]};gl.uniform3fv(uniforms.uSky,skies[season]||skies.winter);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,depth);gl.uniform1i(uniforms.uDepth,0);gl.uniform1i(uniforms.uShadows,shadows?1:0);drawItems();canvas.dataset.ready='true';canvas.dataset.view=view;canvas.dataset.futureBay=String(future);canvas.dataset.season=season;}
+    if(shadows&&shadowDirty){gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);gl.viewport(0,0,1536,1536);gl.clear(gl.DEPTH_BUFFER_BIT);gl.useProgram(depthProgram);gl.uniformMatrix4fv(depthVP,false,lightVP);drawItems();gl.bindFramebuffer(gl.FRAMEBUFFER,null);shadowDirty=false;}
+    gl.viewport(0,0,w,h);gl.clearColor(.895,.899,.87,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(main);const c=camera();gl.uniformMatrix4fv(uniforms.uVP,false,c.mat);gl.uniformMatrix4fv(uniforms.uLight,false,lightVP);gl.uniform3fv(uniforms.uEye,c.e);const skies={winter:[.78,.86,.9],spring:[.7,.82,.69],summer:[.61,.79,.79],fall:[.84,.72,.53]};gl.uniform3fv(uniforms.uSky,skies[season]||skies.winter);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,depth);gl.uniform1i(uniforms.uDepth,0);gl.uniform1i(uniforms.uShadows,shadows?1:0);for(let i=0;i<2;i++){gl.activeTexture(gl.TEXTURE1+i);gl.bindTexture(gl.TEXTURE_2D,materialTextures[i]);}gl.uniform1i(uniforms.uOak,1);gl.uniform1i(uniforms.uStone,2);gl.uniform2fv(uniforms.uMaterialReady,materialReady);gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,lightmap);gl.uniform1i(uniforms.uLightmap,3);gl.uniform1i(uniforms.uLightingReady,lightingReady&&!future?1:0);gl.activeTexture(gl.TEXTURE4);gl.bindTexture(gl.TEXTURE_2D,reflection);gl.uniform1i(uniforms.uReflection,4);gl.uniform1i(uniforms.uReflectionsReady,reflectionsReady?1:0);drawItems();canvas.dataset.ready='true';canvas.dataset.view=view;canvas.dataset.futureBay=String(future);canvas.dataset.season=season;}
   function schedule(){if(!frame&&!disposed)frame=requestAnimationFrame(render);}
   function listen(name,fn,opts){canvas.addEventListener(name,fn,opts);removers.push(()=>canvas.removeEventListener(name,fn,opts));}
   let pointer=null;
@@ -229,12 +419,12 @@ export function createSpaViewer(canvas, options = {}) {
   const observer=new ResizeObserver(schedule);observer.observe(canvas);
   render();options.onReady?.();
   return {
-    setView(name){if(!['overview','entrance','wash','dry','plan'].includes(name))return;view=name;if(name==='overview'){yaw=.57;pitch=.74;radius=13.5;}if(name==='entrance'){eye=[0,1.65,2.9];heading=0;tilt=-.1;}if(name==='wash'){eye=[-.7,1.65,.05];heading=-.23;tilt=-.23;}if(name==='dry'){eye=[.5,1.65,1.8];heading=1.0;tilt=-.17;}schedule();},
+    setView(name){if(!['overview','entrance','wash','dry','plan'].includes(name))return;shadowDirty=true;view=name;if(name==='overview'){yaw=.57;pitch=.74;radius=13.5;}if(name==='entrance'){eye=[0,1.65,2.9];heading=0;tilt=-.1;}if(name==='wash'){eye=[-.7,1.65,.05];heading=-.23;tilt=-.23;}if(name==='dry'){eye=[.5,1.65,1.8];heading=1.0;tilt=-.17;}schedule();},
     setSeason(name){if(['winter','spring','summer','fall'].includes(name)){season=name;schedule();}},
-    setFutureBay(enabled){future=Boolean(enabled);schedule();},
+    setFutureBay(enabled){future=Boolean(enabled);shadowDirty=true;schedule();},
     resize:schedule,
-    exportScene(){return {vertices:Array.from(scenePoints),items:sceneItems.map(item=>({...item}))};},
+    exportScene(){return {stride,vertices:Array.from(scenePoints),items:sceneItems.map(item=>({...item}))};},
     capture(){if(disposed)return null;render();return canvas.toDataURL('image/png');},
-    destroy(){disposed=true;if(frame)cancelAnimationFrame(frame);observer.disconnect();removers.forEach(fn=>fn());canvas.style.touchAction=oldTouch;for(const [type,value] of resources){const method={program:'deleteProgram',buffer:'deleteBuffer',texture:'deleteTexture',framebuffer:'deleteFramebuffer',vertexArray:'deleteVertexArray'}[type];gl[method](value);}canvas.dataset.ready='false';}
+    destroy(){disposed=true;for(const image of materialLoads){image.onload=image.onerror=null;image.src='';}canvas.dataset.materialsReady='false';canvas.dataset.lightingReady='false';canvas.dataset.reflectionsReady='false';if(frame)cancelAnimationFrame(frame);observer.disconnect();removers.forEach(fn=>fn());canvas.style.touchAction=oldTouch;for(const [type,value] of resources){const method={program:'deleteProgram',buffer:'deleteBuffer',texture:'deleteTexture',framebuffer:'deleteFramebuffer',vertexArray:'deleteVertexArray'}[type];gl[method](value);}canvas.dataset.ready='false';}
   };
 }

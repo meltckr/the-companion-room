@@ -7,8 +7,8 @@ Canonical share URL: https://meltckr.github.io/the-companion-room/
 ## Experience
 
 - Cinematic 360-degree views rendered from the actual room geometry with Blender Cycles: arrival, wash/dry bays and finishing counter. Touch drag and pinch zoom; fixed viewpoints.
-- A separate native WebGL spatial model uses the same detailed master geometry and supports free movement, five cameras, a third-bay study and PNG export. Both viewers load on demand.
-- Responsive plan, four-season operating notes, transparent demand calculator, equipment shortlist, capital and operating allowances, six-page PDF and social card.
+- A separate native WebGL spatial model uses the same detailed master geometry and supports free movement, five cameras, a third-bay study and PNG export. Both viewers load on demand. The movable model adds baked scene illumination, photographic material maps and softer lighting.
+- Responsive plan with a labeled person-and-dog scale study, four-season operating notes, transparent demand calculator, equipment shortlist, capital and operating allowances, six-page PDF and social card.
 - Native share button uses the browser share sheet when available, with copy-link fallback. No message is sent automatically.
 
 ## Basis
@@ -36,3 +36,9 @@ Buildless HTML/CSS/ES modules; no external runtime dependencies or tracking. `in
 Source syntax and meaningful capacity tests run with Node. Local browser checks cover all panorama/model cameras, mobile movement, capacity cases, seasonal controls, plan navigation, responsive width, images and OG metadata. Evidence retained locally. Chromium390px phone layout verified; a standalone PlaywrightWebKit runtime was not installed. Native iPhone hardware testing is separate from browser emulation.
 
 Current perspective images, 6K panorama views and browser geometry derive from one detailed Blender master. Mobile panoramas use 4K copies. Touch drag, pinch zoom, guided stops and reduced-motion behavior are supported. Earlier AI illustrations remain archived and are absent from the current presentation. Equipment is a generic visual reference. All geometry is conceptual rather than surveyed or construction-ready. No Unreal application or GPU streaming server is used.
+
+## Reproducing the visual finish
+
+Render the master using `scripts/build-master-scene.py --out assets/master-v4` through Blender. The scene source and licensed material maps are checked in; packed Blender files stay local. The contact-shading export is an economical fallback. `scripts/bake-browser-lightmap.py` builds an optional shared diffuse-illumination atlas from a saved master. Keep intermediate atlas/JSON exports under local evidence. Copy the selected atlas to `assets/master-v4/lighting.png`, its geometry JSON to `evidence/master-scene.json`, and run `scripts/pack-master.py`. Rendered panoramas remain 6K on desktop and are encoded to 4K for phones.
+
+A baked illumination candidate must pass visual review in the browser before publication. The third-bay fit study uses simplified live lighting, avoiding shadows from furniture that has been removed.

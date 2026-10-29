@@ -3,7 +3,7 @@ import LinkPresentation
 
 let provider = LPMetadataProvider()
 provider.timeout = 35
-let target = URL(string: "https://meltckr.github.io/the-companion-room/?v=3")!
+let target = URL(string: "https://meltckr.github.io/the-companion-room/?v=4")!
 provider.startFetchingMetadata(for: target) { metadata, error in
     if let error = error {
         print("APPLE_PREVIEW_ERROR: \(error.localizedDescription)")
@@ -23,7 +23,7 @@ provider.startFetchingMetadata(for: target) { metadata, error in
             print("APPLE_PREVIEW_IMAGE_DATA_ERROR: \(error?.localizedDescription ?? "missing data")")
             exit(2)
         }
-        let output = URL(fileURLWithPath: "/Users/meltucker/Documents/Phoenix Suns 2/east-lansing-pet-spa/evidence/refinement/apple-preview-image")
+        let output = URL(fileURLWithPath: "/Users/meltucker/Documents/Phoenix Suns 2/east-lansing-pet-spa/evidence/realism/apple-preview-image")
         do {
             try data.write(to: output)
             print("APPLE_PREVIEW_IMAGE_BYTES: \(data.count)")

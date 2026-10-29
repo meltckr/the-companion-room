@@ -10,7 +10,7 @@ from reportlab.lib.pagesizes import letter
 ROOT=Path(__file__).resolve().parent.parent
 W,H=792,612
 GREEN=HexColor('#173e35');CREAM=HexColor('#f5f2e9');INK=HexColor('#20362f');MUTED=HexColor('#67756a');LINE=HexColor('#d8dace');GOLD=HexColor('#b99b6b')
-URL='https://meltckr.github.io/the-companion-room/?v=3'
+URL='https://meltckr.github.io/the-companion-room/?v=4'
 class Brief:
  def __init__(self,name,total):
   self.c=canvas.Canvas(str(ROOT/name),pagesize=(W,H),pageCompression=1);self.total=total
@@ -34,14 +34,14 @@ class Brief:
 def decision(d,n=1):
  d.base(n,'THE DEVELOPER DECISION','Two bays at opening. A plan for what follows.')
  d.para('A proposed amenity for one 300-500-unit East Lansing building, mostly studios, serving students and young professionals. The building floorplate and actual pet demand remain to be established.',42,455,708,11)
- d.photo(Path('assets/master/hero.jpg'),42,178,360,225);y=407
+ d.photo(Path('assets/master-v4/hero.jpg'),42,178,360,225);y=407
  for title,body in [('Opening program','Two integrated wash/dry bays plus a separate low paw rinse. Resident use, compatible shampoo and towels included.'),('Preferred placement','Near a conditioned return route from outdoor pet access. Provide locked service storage and a separate finishing counter.'),('Space decision','Compact: 20 x 18 ft / 360 sq ft. Premium: 24 x 22 ft / 528 sq ft, with a reserved third-bay option.')]:
   d.text(title,429,y,12,'Helvetica-Bold',GREEN);y=d.para(body,429,y-13,321,10)-21
  d.rect(42,76,708,74,HexColor('#e5eadc'))
  d.para('<b>Equipment basis:</b> two Evolution mini units start at a published $24,500 before options, freight, tax and installation. <b>Construction:</b> quote required for both room options. The premium $120k-$220k total is an authored planning allowance, pending local validation.',55,137,680,10)
  d.link('Explore the room and compare both plans',42,52)
 main=Brief('The-Companion-Room-Concept-Brief.pdf',6)
-main.rect(0,0,W,H,GREEN);main.photo(Path('assets/master/hero.jpg'),0,260,W,352);main.rect(0,0,W,260,GREEN)
+main.rect(0,0,W,H,GREEN);main.photo(Path('assets/master-v4/hero.jpg'),0,260,W,352);main.rect(0,0,W,260,GREEN)
 main.text('THE COMPANION ROOM',42,224,9,'Helvetica-Bold',HexColor('#c8d2bf'));main.text('A better place for muddy paws.',42,176,36,'Times-Roman',CREAM)
 main.para('A considered resident pet spa for downtown East Lansing. Integrated washing and drying, essential supplies included, and two room footprints to evaluate.',43,149,680,12,HexColor('#d2dccb'))
 for x,big,small in [(43,'2 + 1','INTEGRATED BAYS + PAW RINSE'),(298,'360 / 528','TWO CONCEPTUAL ROOM AREAS, SQ FT'),(557,'Included','SELF-SERVICE RESIDENT AMENITY')]:main.text(big,x,74,25,'Times-Roman',CREAM);main.text(small,x,53,7,'Helvetica',HexColor('#becdb6'))
@@ -52,7 +52,7 @@ main.table([['','Compact','Premium + expansion'],['Illustrative envelope','20 x 
 main.para('The compact option saves 168 square feet. Both are schematic fit studies. Equipment operation, accessibility, service panels and final circulation require review against the actual building and current supplier submittals. The rendered tour shows the premium room.',42,158,708,11)
 main.para('<b>Recommendation:</b> reserve the premium envelope if the floorplate supports it and expansion flexibility has value. Use the compact program where space is constrained, with a separate plan for higher demand.',42,96,708,10);main.page()
 main.base(4,'02 / THE ROUTINE & CAPACITY','Keep the full wash-and-dry routine in one bay.')
-main.photo(Path('assets/master/closeup.jpg'),42,208,340,235)
+main.photo(Path('assets/master-v4/closeup.jpg'),42,208,340,235)
 main.para('All current stills, tour views and browser geometry derive from the same detailed master scene. Equipment remains a generic reference concept.',42,195,340,8)
 main.para('<b>Included:</b> compatible shampoo, clean towels and used-towel return, waste bags, hooks and a phone shelf. Staff own checks, restocking and equipment service.<br/><br/><b>Four seasons:</b> paw rinsing and entry cleanup after snow or mud; conditioned indoor washing, ventilation and towel turnover through the year.<br/><br/><b>Optional:</b> a compact retail niche for brushes or take-home products. Supplier/service terms and fit-out are separate.',414,443,336,10)
 main.rect(42,65,708,91,HexColor('#e5eadc'))

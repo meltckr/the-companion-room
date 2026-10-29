@@ -1,7 +1,7 @@
 """Build the single detailed pet-spa master, render it, and export browser geometry.
 
 Blender --background --python scripts/build-master-scene.py -- \
- --out assets/cinematic --export evidence/master-scene.json --only hero --samples 64
+ --out assets/master-v4 --export evidence/master-scene-contact.json --only hero --samples 64
 
 All views and browser geometry derive from this scene. Equipment remains a generic
 concept; dimensions, ramp pitch, clearances and specifications need design review.
@@ -14,6 +14,7 @@ from pathlib import Path
 import sys
 import bpy
 from mathutils import Vector
+from mathutils.bvhtree import BVHTree
 
 spec=importlib.util.spec_from_file_location('cinematic',Path(__file__).with_name('render-cinematic.py'))
 R=importlib.util.module_from_spec(spec);spec.loader.exec_module(R)
@@ -73,14 +74,44 @@ def photographic_maps():
  root=Path(__file__).resolve().parent.parent/'assets'/'materials'
  for name,asset,scale,warm in [('porcelain','marble_01',.65,True),('limestone','marble_01',.65,True),('oak','oak_veneer_01',.7,False),('oak_edge','oak_veneer_01',.7,False)]:
   m=M[name];nodes=m.node_tree.nodes;links=m.node_tree.links;bsdf=nodes.get('Principled BSDF')
-  tc=nodes.new('ShaderNodeTexCoord');mapping=nodes.new('ShaderNodeVectorMath');mapping.operation='SCALE';mapping.inputs[3].default_value=.16 if warm else scale;links.new(tc.outputs['Generated'] if warm else tc.outputs['Object'],mapping.inputs[0])
+  tc=nodes.new('ShaderNodeTexCoord');info=nodes.new('ShaderNodeObjectInfo')
+  mapping=nodes.new('ShaderNodeVectorMath');mapping.operation='SCALE';mapping.inputs[3].default_value=.10 if warm else scale
   if warm:
-   crop=nodes.new('ShaderNodeVectorMath');crop.operation='ADD';crop.inputs[1].default_value=(.25,.25,.25);links.new(mapping.outputs['Vector'],crop.inputs[0]);mapping=crop
+   # Each physical stone slab samples a different clean region of the CC0 map.
+   # All coordinates stay inside one photographed slab, away from baked grout.
+   turn=nodes.new('ShaderNodeMath');turn.operation='MULTIPLY';turn.inputs[1].default_value=4;links.new(info.outputs['Random'],turn.inputs[0])
+   quant=nodes.new('ShaderNodeMath');quant.operation='FLOOR';links.new(turn.outputs[0],quant.inputs[0])
+   angle=nodes.new('ShaderNodeMath');angle.operation='MULTIPLY';angle.inputs[1].default_value=math.pi/2;links.new(quant.outputs[0],angle.inputs[0])
+   rotate=nodes.new('ShaderNodeVectorRotate');rotate.rotation_type='AXIS_ANGLE';rotate.inputs['Center'].default_value=(.5,.5,.5);rotate.inputs['Axis'].default_value=(0,0,1);links.new(tc.outputs['Generated'],rotate.inputs['Vector']);links.new(angle.outputs[0],rotate.inputs['Angle']);links.new(rotate.outputs['Vector'],mapping.inputs[0])
+   offset=nodes.new('ShaderNodeCombineXYZ')
+   for axis,factor,extent,base in [('X',1,.01,.42),('Y',7,.01,.42),('Z',17,.01,.42)]:
+    seed=nodes.new('ShaderNodeMath');seed.operation='MULTIPLY';seed.inputs[1].default_value=factor;links.new(info.outputs['Random'],seed.inputs[0])
+    fract=nodes.new('ShaderNodeMath');fract.operation='FRACT';links.new(seed.outputs[0],fract.inputs[0])
+    remap=nodes.new('ShaderNodeMapRange');remap.inputs['To Min'].default_value=base;remap.inputs['To Max'].default_value=base+extent;links.new(fract.outputs[0],remap.inputs['Value']);links.new(remap.outputs[0],offset.inputs[axis])
+   crop=nodes.new('ShaderNodeVectorMath');crop.operation='ADD';links.new(mapping.outputs['Vector'],crop.inputs[0]);links.new(offset.outputs[0],crop.inputs[1]);mapping=crop
+  else:
+   links.new(tc.outputs['Object'],mapping.inputs[0])
   tex=nodes.new('ShaderNodeTexImage');tex.image=bpy.data.images.load(str(root/(asset+('_diff_4k.jpg' if warm else '_diff_1k.jpg'))),check_existing=True);tex.projection='BOX';tex.projection_blend=.12;links.new(mapping.outputs['Vector'],tex.inputs['Vector'])
-  tint=nodes.new('ShaderNodeMixRGB');tint.blend_type='MULTIPLY';tint.inputs[0].default_value=.35 if warm else .45;tint.inputs[2].default_value=(.85,.80,.70,1) if warm else (.55,.42,.30,1);links.new(tex.outputs['Color'],tint.inputs[1]);links.new(tint.outputs[0],bsdf.inputs['Base Color'])
+  color=tex.outputs['Color']
+  if warm:
+   neutral=nodes.new('ShaderNodeHueSaturation');neutral.inputs['Saturation'].default_value=.38;neutral.inputs['Value'].default_value=1.04;links.new(color,neutral.inputs['Color']);color=neutral.outputs[0]
+  tint=nodes.new('ShaderNodeMixRGB');tint.blend_type='MULTIPLY';tint.inputs[0].default_value=.28 if warm else .45;tint.inputs[2].default_value=(.91,.90,.86,1) if warm else (.55,.42,.30,1);links.new(color,tint.inputs[1])
+  variation=nodes.new('ShaderNodeMapRange');variation.inputs['To Min'].default_value=.965;variation.inputs['To Max'].default_value=1.025;links.new(info.outputs['Random'],variation.inputs['Value'])
+  grain=nodes.new('ShaderNodeMixRGB');grain.blend_type='MULTIPLY';grain.inputs[0].default_value=1;links.new(tint.outputs[0],grain.inputs[1]);links.new(variation.outputs[0],grain.inputs[2]);links.new(grain.outputs[0],bsdf.inputs['Base Color'])
   rough=nodes.new('ShaderNodeTexImage');rough.image=bpy.data.images.load(str(root/(asset+'_rough_1k.jpg')),check_existing=True);rough.image.colorspace_settings.name='Non-Color';rough.projection='BOX';rough.projection_blend=.12;links.new(mapping.outputs['Vector'],rough.inputs['Vector'])
-  remap=nodes.new('ShaderNodeMapRange');remap.inputs['To Min'].default_value=.29 if warm else .35;remap.inputs['To Max'].default_value=.52;links.new(rough.outputs['Color'],remap.inputs['Value']);links.new(remap.outputs[0],bsdf.inputs['Roughness'])
+  remap=nodes.new('ShaderNodeMapRange');remap.inputs['To Min'].default_value=.31 if warm else .35;remap.inputs['To Max'].default_value=.49;links.new(rough.outputs['Color'],remap.inputs['Value']);links.new(remap.outputs[0],bsdf.inputs['Roughness'])
   bump=nodes.new('ShaderNodeBump');bump.inputs['Strength'].default_value=.13;bump.inputs['Distance'].default_value=.0007;links.new(rough.outputs['Color'],bump.inputs['Height']);links.new(bump.outputs['Normal'],bsdf.inputs['Normal'])
+ # Fine satin paint and brushed metal have broad, soft reflection transitions.
+ for name,low,high in [('forest',.33,.43),('stainless',.23,.34)]:
+  m=M[name];nodes=m.node_tree.nodes;links=m.node_tree.links;bsdf=nodes.get('Principled BSDF')
+  noise=nodes.new('ShaderNodeTexNoise');noise.inputs['Scale'].default_value=145 if name=='forest' else 600;noise.inputs['Detail'].default_value=2
+  tc=nodes.new('ShaderNodeTexCoord');links.new(tc.outputs['Object'],noise.inputs['Vector'])
+  rough=nodes.new('ShaderNodeMapRange');rough.inputs['To Min'].default_value=low;rough.inputs['To Max'].default_value=high;links.new(noise.outputs['Fac'],rough.inputs['Value']);links.new(rough.outputs[0],bsdf.inputs['Roughness'])
+  if name=='forest':
+   bsdf.inputs['Coat Weight'].default_value=.12;bsdf.inputs['Coat Roughness'].default_value=.32
+   bump=nodes.new('ShaderNodeBump');bump.inputs['Distance'].default_value=.00012;bump.inputs['Strength'].default_value=.12;links.new(noise.outputs['Fac'],bump.inputs['Height']);links.new(bump.outputs[0],bsdf.inputs['Normal'])
+  else:bsdf.inputs['Anisotropic'].default_value=.28
+ cloth=M['linen'].node_tree.nodes.get('Principled BSDF');cloth.inputs['Sheen Weight'].default_value=.32;cloth.inputs['Sheen Roughness'].default_value=.7;cloth.inputs['Specular IOR Level'].default_value=.25
 
 
 def box(name,p,d,material='forest',bevel=.008):
@@ -307,12 +338,13 @@ def amenities():
 
 def lighting():
  # Lighting balanced for room-scale depth and warm highlights without white clipping.
- R.area('Window soft daylight',(4.15,2.05,.05),(0,1.0,-.6),440,(.84,.91,1),3.8,1.5)
- R.area('Ceiling bounce',(0,2.99,.2),(0,0,0),95,(1,.89,.75),4.2,3.6)
- R.area('Upper stone wash',(-.97,2.91,-3.10),(-.97,1.9,-3.28),75,(1,.76,.49),4.5,.10)
- for x in [-2.05,.15]:R.area('Under shelf stone wash',(x,1.86,-3.0),(x,.95,-3.25),22,(1,.78,.52),1.84,.08)
- R.area('Metal reflection softbox',(-2.8,2.2,.4),(-.9,.9,-2.5),80,(1,.9,.78),1.4,2.0)
- R.area('Entry soft fill',(0,2.2,3.22),(0,1,-1.5),35,(1,.91,.8),2.8,1.3)
+ R.area('Window soft daylight',(4.15,2.05,.05),(0,1.0,-.6),520,(.80,.89,1),3.8,1.5)
+ R.area('Ceiling bounce',(0,2.99,.2),(0,0,0),70,(1,.96,.88),4.2,3.6)
+ R.area('Upper stone wash',(-.97,2.91,-3.10),(-.97,1.9,-3.28),68,(1,.78,.55),4.5,.10)
+ for x in [-2.05,.15]:R.area('Under shelf stone wash',(x,1.86,-3.0),(x,.95,-3.25),20,(1,.80,.58),1.84,.08)
+ R.area('Metal reflection softbox',(-2.8,2.2,.4),(-.9,.9,-2.5),95,(1,.94,.85),1.4,2.0)
+ R.area('Cool metal edge',(2.9,2.15,.7),(-.9,.85,-2.4),48,(.81,.90,1),.85,1.8)
+ R.area('Entry soft fill',(0,2.2,3.22),(0,1,-1.5),32,(1,.97,.92),2.8,1.3)
  for x in [-2.15,.4,2.5]:
   for z in [-2,0,1.9]:R.area('Recessed pool',(x,2.98,z),(x,0,z),13,(1,.85,.65),.12)
  # A plain luminous exterior plane gives a neutral winter outlook, never a fake site.
@@ -324,8 +356,40 @@ def lighting():
   if light.type=='LIGHT':light.visible_camera=False;light.visible_transmission=False
 
 
+def contact_ao_sampler(graph):
+ """Eight cosine-weighted BVH rays; distance-limited contact AO in world space."""
+ positions=[];faces=[]
+ for obj in bpy.context.scene.objects:
+  if obj.type not in ('MESH','CURVE','FONT') or obj.get('viewer_skip') or obj.hide_render or obj.get('viewer_group')=='future':continue
+  if any(m and m.get('viewer_kind',0)==4 for m in obj.data.materials):continue
+  evaluated=obj.evaluated_get(graph);mesh=evaluated.to_mesh();mesh.calc_loop_triangles();base=len(positions)
+  positions.extend(obj.matrix_world@v.co for v in mesh.vertices)
+  faces.extend(tuple(base+i for i in tri.vertices) for tri in mesh.loop_triangles)
+  evaluated.to_mesh_clear()
+ tree=BVHTree.FromPolygons(positions,faces,all_triangles=True,epsilon=.0001)
+ cache={};radius=.8;epsilon=.006
+ def sample(position,normal):
+  key=tuple(round(v*500) for v in position)+tuple(round(v*40) for v in normal)
+  if key in cache:return cache[key]
+  n=normal.normalized();axis=Vector((0,0,1)) if abs(n.z)<.9 else Vector((1,0,0))
+  tangent=n.cross(axis).normalized();bitangent=n.cross(tangent)
+  # A stable per-vertex rotation avoids obvious directional bands with eight rays.
+  seed=(key[0]*73856093 ^ key[1]*19349663 ^ key[2]*83492791)&65535
+  phase=seed/65536*math.tau;origin=position+n*epsilon;occlusion=0.
+  for i in range(8):
+   u=(i+.5)/8;theta=i*2.399963229728653+phase;r=math.sqrt(u)
+   direction=tangent*(r*math.cos(theta))+bitangent*(r*math.sin(theta))+n*math.sqrt(1-u)
+   hit,_,_,distance=tree.ray_cast(origin,direction,radius)
+   if hit is not None:occlusion+=(1-distance/radius)**1.5
+  # Keep color readable; this is ambient contact shading, not direct-light shadow.
+  value=max(.54,1-.46*occlusion/8);cache[key]=value;return value
+ return sample,cache
+
+
 def export_browser(path):
  graph=bpy.context.evaluated_depsgraph_get();vertices=[];items=[]
+ ao,ao_cache=contact_ao_sampler(graph)
+ print('AO_BVH_READY',flush=True)
  for obj in bpy.context.scene.objects:
   if obj.type not in ('MESH','CURVE','FONT') or obj.get('viewer_skip'):continue
   # Simplification affects only the browser export; the render master keeps its bevels.
@@ -333,7 +397,7 @@ def export_browser(path):
   if obj.type=='MESH':
    simplify=obj.modifiers.new('Temporary browser LOD','DECIMATE');simplify.ratio=.38
    graph.update()
-  evaluated=obj.evaluated_get(graph);mesh=evaluated.to_mesh();mesh.calc_loop_triangles();start=len(vertices)//11
+  evaluated=obj.evaluated_get(graph);mesh=evaluated.to_mesh();mesh.calc_loop_triangles();start=len(vertices)//12
   normal_matrix=obj.matrix_world.to_3x3().inverted().transposed()
   for tri in mesh.loop_triangles:
    material=obj.data.materials[tri.material_index] if len(obj.data.materials)>tri.material_index else M['plaster']
@@ -341,14 +405,15 @@ def export_browser(path):
    for li in tri.loops:
     loop=mesh.loops[li];v=obj.matrix_world@mesh.vertices[loop.vertex_index].co
     n=normal_matrix@mesh.corner_normals[li].vector;n.normalize()
-    vertices.extend(round(float(a),5) for a in (v.x,v.z,-v.y,n.x,n.z,-n.y,*rgb,rough,kind))
-  count=len(vertices)//11-start
+    shade=1. if kind in (4,5) else ao(v,n)
+    vertices.extend(round(float(a),5) for a in (v.x,v.z,-v.y,n.x,n.z,-n.y,*rgb,rough,kind,shade))
+  count=len(vertices)//12-start
   if count:items.append({'start':start,'count':count,'group':obj.get('viewer_group','all')})
   evaluated.to_mesh_clear()
   if simplify:obj.modifiers.remove(simplify)
  output=Path(path);output.parent.mkdir(parents=True,exist_ok=True)
- output.write_text(json.dumps({'vertices':vertices,'items':items},separators=(',',':')))
- print('BROWSER_EXPORT',len(vertices)//11,'vertices',len(items),'items',output,flush=True)
+ output.write_text(json.dumps({'stride':12,'vertices':vertices,'items':items,'ambientOcclusion':{'method':'8 cosine-weighted BVH rays','maxDistanceMeters':.8,'minFactor':.54,'cacheEntries':len(ao_cache)}},separators=(',',':')))
+ print('BROWSER_EXPORT',len(vertices)//12,'vertices',len(items),'items','AO_CACHE',len(ao_cache),output,flush=True)
 
 
 def main():

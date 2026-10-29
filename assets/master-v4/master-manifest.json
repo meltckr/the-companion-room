@@ -1,0 +1,116 @@
+{
+  "source": "scripts/build-master-scene.py",
+  "geometry": "One detailed master for stills, panoramas and browser export",
+  "cameras": {
+    "hero": {
+      "position": [
+        0,
+        1.75,
+        4.7
+      ],
+      "target": [
+        0,
+        1.15,
+        -1.7
+      ],
+      "panoramic": false
+    },
+    "closeup": {
+      "position": [
+        -0.75,
+        1.52,
+        -0.05
+      ],
+      "target": [
+        -1.9,
+        1.0,
+        -2.5
+      ],
+      "panoramic": false
+    },
+    "rinse": {
+      "position": [
+        -0.45,
+        1.48,
+        2.7
+      ],
+      "target": [
+        -2.85,
+        0.68,
+        1.5
+      ],
+      "panoramic": false
+    },
+    "overview": {
+      "position": [
+        8,
+        7.5,
+        9
+      ],
+      "target": [
+        0,
+        0.7,
+        0
+      ],
+      "panoramic": false
+    },
+    "entrance": {
+      "position": [
+        0,
+        1.65,
+        2.9
+      ],
+      "target": [
+        0,
+        1.65,
+        -2.5
+      ],
+      "panoramic": true
+    },
+    "wash": {
+      "position": [
+        -0.7,
+        1.65,
+        0.05
+      ],
+      "target": [
+        -0.7,
+        1.65,
+        -2.5
+      ],
+      "panoramic": true
+    },
+    "dry": {
+      "position": [
+        0.5,
+        1.65,
+        1.8
+      ],
+      "target": [
+        0.5,
+        1.65,
+        -2.5
+      ],
+      "panoramic": true
+    }
+  },
+  "panorama_orientation": "All panorama centers face source -Z / north.",
+  "note": "Generic equipment and neutral winter outlook; architectural concept.",
+  "rendering": {
+    "renderer": "Blender Cycles / Metal",
+    "samples": 128,
+    "perspective": [
+      3200,
+      1800
+    ],
+    "desktopPanoramas": [
+      6144,
+      3072
+    ],
+    "mobilePanoramas": [
+      4096,
+      2048
+    ],
+    "materialVersion": 4
+  }
+}

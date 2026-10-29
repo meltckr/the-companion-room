@@ -36,9 +36,9 @@ function cinemaReady(){
 }
 async function ensurePanorama(){
  if(panorama)return panorama;if(panoramaPromise)return panoramaPromise;
- panoramaPromise=(async()=>{const {createPanoramaViewer}=await import('./panorama.js?v=3');
+ panoramaPromise=(async()=>{const {createPanoramaViewer}=await import('./panorama.js?v=4');
   const mobile=matchMedia('(max-width:800px)').matches;
-  const assets=window.CINEMATIC_ASSETS||Object.fromEntries(['entrance','wash','dry'].map(name=>[name,`assets/master/${name}${mobile?'-mobile':''}.jpg`]));
+  const assets=window.CINEMATIC_ASSETS||Object.fromEntries(['entrance','wash','dry'].map(name=>[name,`assets/master-v4/${name}${mobile?'-mobile':''}.jpg`]));
   panorama=createPanoramaViewer($('#cinema-canvas'),{assets,onReady:cinemaReady,onError(error){$('#cinema-status').textContent='The tour could not load. You can still explore the room images and plans below.';$('#start-tour').disabled=false;console.warn('Room tour:',error)},onViewChange:updateStop});
   window.spaPanorama=panorama;return panorama;
  })();try{return await panoramaPromise}catch(error){panoramaPromise=null;throw error}
@@ -53,8 +53,8 @@ $$('[data-cinema-view]').forEach(b=>b.addEventListener('click',()=>panorama?.set
 async function ensureModel(){
  if(viewer)return viewer;if(modelPromise)return modelPromise;
  modelPromise=(async()=>{
-  const [{createSpaViewer},{loadMasterGeometry}]=await Promise.all([import('./model.js?v=3'),import('./master-loader.mjs?v=3')]);
-  const geometry=await loadMasterGeometry();
+  const [{createSpaViewer},{loadMasterGeometry}]=await Promise.all([import('./model.js?v=4'),import('./master-loader.mjs?v=4')]);
+  const geometry=await loadMasterGeometry({base:'assets/master-v4'});
   viewer=createSpaViewer($('#spa-canvas'),{geometry,onReady(){ $('#viewer-status').classList.add('hidden');$('#save-view').disabled=false; },onError(error){$('#viewer-status').textContent='The layout model is unavailable. The rendered tour and room plans remain available.';console.warn(error)}});
   window.spaViewer=viewer;return viewer;
  })();try{return await modelPromise}catch(error){modelPromise=null;$('#viewer-status').textContent='The layout model could not load. The rendered tour and plans remain available.';throw error}
@@ -69,7 +69,7 @@ $$('[data-quality]').forEach(b=>b.addEventListener('click',()=>setQuality(b.data
 function activateView(name){viewer?.setView(name);$('.walk-controls').classList.toggle('hidden',name==='overview'||name==='plan');$$('button[data-view]').forEach(b=>{const on=b.dataset.view===name;b.classList.toggle('active',on);b.setAttribute('aria-pressed',on)});}
 $$('button[data-view]').forEach(b=>b.addEventListener('click',()=>activateView(b.dataset.view)));
 $$('[data-walk]').forEach(b=>b.addEventListener('click',()=>$('#spa-canvas').dispatchEvent(new KeyboardEvent('keydown',{key:b.dataset.walk,bubbles:true}))));
-$('#future-bay').addEventListener('change',e=>{const on=e.target.checked;viewer?.setFutureBay(on);$('#bay-note').textContent=on?'Three-bay study · Expansion cost separate':'Two integrated bays + expansion alcove';$('#future-plan').setAttribute('fill',on?'#a8bda4':'#e3e4d7');selectZone('future')});
+$('#future-bay').addEventListener('change',e=>{const on=e.target.checked;viewer?.setFutureBay(on);$('#bay-note').textContent=on?'Third-bay fit study · Simplified lighting':'Two integrated bays + expansion alcove';$('#future-plan').setAttribute('fill',on?'#a8bda4':'#e3e4d7');selectZone('future')});
 $$('button[data-season]').forEach(b=>b.addEventListener('click',()=>{const name=b.dataset.season;const t=seasons[name];$('#season-title').textContent=t[0];$('#season-body').textContent=t[1];$('#season-operation').textContent=t[2];$$('button[data-season]').forEach(el=>{const on=el===b;el.classList.toggle('active',on);el.setAttribute('aria-pressed',on)});viewer?.setSeason(name)}));
 $$('[data-layout]').forEach(b=>b.addEventListener('click',()=>{const premium=b.dataset.layout==='premium';$('#premium-layout').classList.toggle('hidden',!premium);$('#compact-layout').classList.toggle('hidden',premium);$$('[data-layout]').forEach(el=>{const on=el===b;el.classList.toggle('active',on);el.setAttribute('aria-pressed',on)});$('#layout-choice').textContent=premium?'Premium plan selected':'Compact plan selected';$('#layout-tradeoff').textContent=premium?'Reserve 528 sq ft if the floorplate supports it; preserve an option for a third bay.':'Use 360 sq ft for the same opening bay count; expansion would require another location or a revised plan.';}));
 let toastTimer;
@@ -83,5 +83,5 @@ const printStates=new Map();
 window.addEventListener('beforeprint',()=>{document.querySelectorAll('details').forEach(d=>{printStates.set(d,d.open);d.open=true})});
 window.addEventListener('afterprint',()=>{for(const [d,open]of printStates)d.open=open;printStates.clear()});
 $$('.print').forEach(b=>b.addEventListener('click',()=>window.print()));
-$$('.share-action').forEach(b=>b.addEventListener('click',async()=>{const url='https://meltckr.github.io/the-companion-room/?v=3';try{if(navigator.share){await navigator.share({title:'The Companion Room',text:'A considered resident pet-spa concept for East Lansing.',url});return}await navigator.clipboard.writeText(url);announce('Link copied. Paste it into iMessage.')}catch(error){if(error.name!=='AbortError')announce(url)}}));
+$$('.share-action').forEach(b=>b.addEventListener('click',async()=>{const url='https://meltckr.github.io/the-companion-room/?v=4';try{if(navigator.share){await navigator.share({title:'The Companion Room',text:'A considered resident pet-spa concept for East Lansing.',url});return}await navigator.clipboard.writeText(url);announce('Link copied. Paste it into iMessage.')}catch(error){if(error.name!=='AbortError')announce(url)}}));
 setQuality('cinematic');
