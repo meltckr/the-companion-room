@@ -22,6 +22,10 @@ page=page.replace('<script type="module" src="app.mjs?v=3"></script>','<script t
 for asset in ['master/hero.webp','master/detail.webp']:
     data=base64.b64encode((root/'assets'/asset).read_bytes()).decode()
     page=page.replace('assets/'+asset,'data:image/webp;base64,'+data)
+for size in [32,180]:
+    asset=f'companion-room-icon-{size}.png'
+    data=base64.b64encode((root/'assets'/asset).read_bytes()).decode()
+    page=page.replace('assets/'+asset,'data:image/png;base64,'+data)
 output=root/'Open-The-Companion-Room.html'
 output.write_text(page)
 with zipfile.ZipFile(root/'Companion-Room-Review-Package.zip','w',zipfile.ZIP_DEFLATED) as archive:
