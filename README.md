@@ -33,7 +33,7 @@ Buildless HTML/CSS/ES modules; no external runtime dependencies or tracking. `in
 
 ## Verification and limits
 
-Source syntax and meaningful capacity tests run with Node. Local browser checks cover all panorama/model cameras, mobile movement, capacity cases, seasonal controls, plan navigation, responsive width, images and OG metadata. Evidence retained locally. Chromium390px phone layout verified; a standalone PlaywrightWebKit runtime was not installed. Native iPhone hardware testing is separate from browser emulation.
+Source syntax and meaningful capacity tests run with Node. Local browser checks cover all panorama/model cameras, mobile movement, capacity cases, seasonal controls, plan navigation, responsive width, images and OG metadata. Evidence retained locally. Phone touch startup is verified in Chromium and Safari-family WebKit, including slow/failed loads, retry, texture limits and landscape orientation. Native iPhone hardware testing is separate from browser emulation.
 
 Current perspective images, 6K panorama views and browser geometry derive from one detailed Blender master. Mobile panoramas use 4K copies. Touch drag, pinch zoom, guided stops and reduced-motion behavior are supported. Earlier AI illustrations remain archived and are absent from the current presentation. Equipment is a generic visual reference. All geometry is conceptual rather than surveyed or construction-ready. No Unreal application or GPU streaming server is used.
 

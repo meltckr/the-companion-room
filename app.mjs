@@ -21,6 +21,7 @@ $$('[data-scenario]').forEach(el=>el.addEventListener('click',()=>{for(const [k,
 const seasons={winter:['Snow outside. A warm rinse inside.','Place the paw-rinse zone along the conditioned return path from outdoor pet access. Contain snowmelt and salt residue near entry, then provide towel drying before residents head upstairs.','Operations focus: entry mats, frequent wet-floor checks, towel replenishment and a clear path to the lifts.'],spring:['A quick stop after a muddy walk.','Make the low rinse convenient for paws and lower legs. Use washable wall protection around the spray zone and provide space to towel off before leaving.','Operations focus: mud capture, drain-strainer checks, surface cleaning and keeping clean towels separate from used ones.'],summer:['A comfortable place for a full wash.','Keep the indoor amenity conditioned and ventilated. Give residents straightforward controls for washing and powered drying in each bay, with a separate towel-and-brushing counter.','Operations focus: ventilation checks, water temperature controls, equipment service and restocking metered supplies.'],fall:['Leaves, rain and a simple reset.','Keep a clear entry sequence as wet coats and fallen leaves return indoors. Place hooks and a phone shelf within easy reach of the rinse area.','Operations focus: entrance cleanup, waste bags, towel turnover and reviewing the operating plan before winter.']};
 let viewer, panorama, modelPromise, panoramaPromise;
 let activeMode='cinematic', tourStarted=false, currentStop='entrance';
+let tourState='idle', tourGeneration=0;
 const stopOrder=['entrance','wash','dry'];
 const stops={
  entrance:{title:'The arrival',kicker:'01 / AFTER THE WALK',heading:'A useful stop on the way home.',body:'A low paw rinse near entry, a place for coats and supplies, and a clear route to the full wash bays.'},
@@ -28,24 +29,82 @@ const stops={
  dry:{title:'The finishing counter',kicker:'03 / READY TO HEAD UPSTAIRS',heading:'A place to finish comfortably.',body:'A flat counter, clean towels and brushes make the last part of the routine easier. Keep used towels separate and supplies maintained by a named operator.'}
 };
 function updateStop(name){currentStop=name;const t=stops[name];const index=stopOrder.indexOf(name);$('#stop-number').textContent=`0${index+1} / 03`;$('#stop-title').textContent=t.title;$('#tour-caption-kicker').textContent=t.kicker;$('#tour-caption-title').textContent=t.heading;$('#tour-caption-body').textContent=t.body;$('#tour-next').textContent=index===2?'Back to arrival ↩':`Next: ${stops[stopOrder[index+1]].title.toLowerCase()} →`;$$('[data-cinema-view]').forEach(b=>{const on=b.dataset.cinemaView===name;b.classList.toggle('active',on);b.setAttribute('aria-pressed',on)});}
+// Older cached HTML can load the current script after a mobile refresh.
+if(!$('#tour-start-label')){
+ $('#start-tour').lastElementChild.innerHTML='<span id="tour-start-label">Start the tour</span><small id="tour-start-hint">Three stops. Explore at your pace.</small>';
+}
+if(!$('#tour-feedback')){
+ const feedback=document.createElement('p');
+ feedback.id='tour-feedback';feedback.className='tour-feedback';feedback.setAttribute('role','status');feedback.setAttribute('aria-live','polite');
+ $('#tour-poster').append(feedback);
+}
+function setTourState(state,message=''){
+ tourState=state;
+ const loading=state==='loading';
+ $('#start-tour').disabled=loading;
+ $('#start-tour').setAttribute('aria-busy',String(loading));
+ $('.cinema-wrap').setAttribute('aria-busy',String(loading));
+ $('#tour-poster').classList.toggle('tour-loading',loading);
+ $('#tour-poster').classList.toggle('tour-open',state==='ready');
+ $('#tour-start-label').textContent=loading?'Opening the tour…':state==='error'?'Try the tour again':'Start the tour';
+ $('#tour-start-hint').textContent=loading?'Loading the first room view.':state==='error'?'Tap to reconnect and open the room.':'Three stops. Explore at your pace.';
+ $('#tour-feedback').textContent=message;
+ $('#cinema-status').classList.add('hidden');
+}
 function cinemaReady(){
- $('#cinema-status').classList.add('hidden');$('#tour-poster').classList.add('tour-open');
+ tourStarted=true;setTourState('ready');
  for(const id of ['tour-stamp','tour-gesture','tour-stops','tour-next'])$('#'+id).classList.remove('hidden');
  if(document.fullscreenEnabled)$('#cinema-fullscreen').classList.remove('hidden');
- $('#start-tour').disabled=false;updateStop(currentStop);
+ updateStop(currentStop);
+}
+function discardPanorama(){
+ panorama?.destroy();panorama=null;panoramaPromise=null;window.spaPanorama=null;
+}
+function tourFailed(error){
+ tourStarted=false;
+ setTourState('error','The room view could not open. Check your connection and tap to try again.');
+ console.warn('Room tour:',error);
 }
 async function ensurePanorama(){
- if(panorama)return panorama;if(panoramaPromise)return panoramaPromise;
- panoramaPromise=(async()=>{const {createPanoramaViewer}=await import('./panorama.js?v=4');
-  const mobile=matchMedia('(max-width:800px)').matches;
+ if(panorama&&tourState==='ready')return panorama;
+ if(panoramaPromise)return panoramaPromise;
+ const generation=++tourGeneration;
+ let deadline;
+ const expired=new Promise((resolve,reject)=>{deadline=setTimeout(()=>reject(new Error('The first room view timed out.')),20000);});
+ const initialized=(async()=>{
+  const moduleUrl=window.CINEMATIC_MODULE||`./panorama.js?v=4.1&attempt=${generation}`;
+  const {createPanoramaViewer}=await import(moduleUrl);
+  if(generation!==tourGeneration)return null;
+  // Touch phones also need the lighter panorama when held in landscape.
+  const mobile=matchMedia('(max-width:800px), (pointer:coarse)').matches;
   const assets=window.CINEMATIC_ASSETS||Object.fromEntries(['entrance','wash','dry'].map(name=>[name,`assets/master-v4/${name}${mobile?'-mobile':''}.jpg`]));
-  panorama=createPanoramaViewer($('#cinema-canvas'),{assets,onReady:cinemaReady,onError(error){$('#cinema-status').textContent='The tour could not load. You can still explore the room images and plans below.';$('#start-tour').disabled=false;console.warn('Room tour:',error)},onViewChange:updateStop});
-  window.spaPanorama=panorama;return panorama;
- })();try{return await panoramaPromise}catch(error){panoramaPromise=null;throw error}
+  return await new Promise((resolve,reject)=>{
+   const failed=error=>{
+    if(generation!==tourGeneration)return;
+    if(tourState==='loading')reject(error);
+    else{++tourGeneration;discardPanorama();tourFailed(error);}
+   };
+   try{
+    panorama=createPanoramaViewer($('#cinema-canvas'),{assets,onReady(){
+     if(generation!==tourGeneration)return;
+     cinemaReady();resolve(panorama);
+    },onError:failed,onViewChange:updateStop});
+    window.spaPanorama=panorama;
+   }catch(error){failed(error);}
+  });
+ })();
+ panoramaPromise=Promise.race([initialized,expired]);
+ try{return await panoramaPromise;}
+ catch(error){
+  if(generation===tourGeneration){++tourGeneration;discardPanorama();tourFailed(error);}
+  throw error;
+ }finally{clearTimeout(deadline);if(generation===tourGeneration)panoramaPromise=null;}
 }
 async function startTour(){
- tourStarted=true;$('#start-tour').disabled=true;$('#cinema-status').classList.remove('hidden');
- try{await ensurePanorama()}catch(error){$('#cinema-status').textContent='The tour could not load. Please try again.';$('#start-tour').disabled=false;console.warn(error)}
+ if(tourState==='loading')return;
+ if(tourState==='ready')return;
+ setTourState('loading');
+ try{await ensurePanorama();}catch{ /* The visible retry state is set by ensurePanorama. */ }
 }
 $('#start-tour').addEventListener('click',startTour);
 $('#tour-next').addEventListener('click',()=>panorama?.setView(stopOrder[(stopOrder.indexOf(currentStop)+1)%3]));

@@ -143,6 +143,41 @@ export function createPanoramaViewer(canvas, options = {}) {
     transition = null;
     render();
   }
+  function uploadPanorama(image) {
+    if (gl.isContextLost()) throw new Error('The tour graphics are recovering. Please try again.');
+    const maximum = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+    const firstEdge = Math.min(maximum, Math.max(image.naturalWidth, image.naturalHeight));
+    const lastEdge = Math.min(1024, firstEdge);
+    for (let edge = firstEdge; edge >= lastEdge; edge = Math.max(lastEdge, Math.floor(edge / 2))) {
+      const scale = Math.min(1, edge / image.naturalWidth, edge / image.naturalHeight);
+      let source = image;
+      if (scale < 1) {
+        source = document.createElement('canvas');
+        source.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        source.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const context = source.getContext('2d');
+        if (!context) throw new Error('This device could not prepare the room view.');
+        context.drawImage(image, 0, 0, source.width, source.height);
+      }
+      const result = gl.createTexture();
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, result);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, source);
+      const error = gl.getError();
+      if (error === gl.NO_ERROR) {
+        canvas.dataset.panoramaWidth = String(source.naturalWidth || source.width);
+        return result;
+      }
+      gl.deleteTexture(result);
+      if (error !== gl.OUT_OF_MEMORY || edge === lastEdge) break;
+    }
+    throw new Error('The device could not open the room view. Please try again.');
+  }
   function setView(name) {
     if (disposed) return;
     const next = name === 'overview' || name === 'plan' ? 'entrance' : name;
@@ -164,17 +199,7 @@ export function createPanoramaViewer(canvas, options = {}) {
       pending = null;
       let uploaded = null;
       try {
-        const maximum = gl.getParameter(gl.MAX_TEXTURE_SIZE);
-        if (image.naturalWidth > maximum || image.naturalHeight > maximum) throw new Error('This panorama exceeds the device texture size limit.');
-        uploaded = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, uploaded);
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
-        if (gl.getError() !== gl.NO_ERROR) throw new Error('The device could not upload the panorama.');
+        uploaded = uploadPanorama(image);
         transition = { texture: uploaded, view: next, start: performance.now(), previous: { yaw, pitch, fov } };
         yaw = targetYaw = next === 'dry' ? Math.PI / 3 : next === 'wash' ? -Math.PI / 6 : 0;
         pitch = targetPitch = (next === 'dry' ? -10 : next === 'wash' ? -8 : -5)*radians;
