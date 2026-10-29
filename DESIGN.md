@@ -1,6 +1,6 @@
 # Design
 ## Source of truth
-Active, October 29, 2026. Private local concept presentation, architectural model, capacity calculator, and print brief. User brief: downtown East Lansing; one approximately 14-story building, 300–500 apartments, mostly studios, proposed rents $1,500–$3,000/month, students and young professionals. Self-service pet washing included as an amenity. Site acquired; floor plan and allotted room area unknown. No existing pet-spa project found in workspace.
+Active, October 29, 2026. Public concept presentation, architectural model, capacity calculator, and print brief. User brief: downtown East Lansing; one approximately 14-story building, 300–500 apartments, mostly studios, proposed rents $1,500–$3,000/month, students and young professionals. Self-service pet washing included as an amenity. Site acquired; floor plan and allotted room area unknown. Established project and public URL reused: https://meltckr.github.io/the-companion-room/.
 ## Brand
 Working concept name: The Companion Room. Warm boutique hospitality, forest green, stone, wood-look warmth. Prepared for discussion by Mel Tucker / AVC. No implication of an approved building name or developer endorsement. Avoid cartoon pet-store styling and ornate luxury.
 ## Product goals
@@ -14,7 +14,7 @@ Lead with imagery; follow with decisions. Label assumptions where read. Integrat
 ## Visual language
 Ivory #f5f2e9, forest #173e35, ink #20362f, warm brass #b99b6b. Georgia editorial headlines, system sans body. Large imagery, broad whitespace, thin rules, restrained rounded controls. No decorative motion.
 ## Components
-Hero, evidence strip, cinematic rendered 360 tour plus native WebGL model with presets, interactive SVG plan, labeled range inputs, season selector, cost table, source disclosures. Tokens owned by style.css. Capacity math owned by capacity.mjs; geometry owned by model.js.
+Hero, evidence strip, cinematic rendered 360 tour plus native WebGL model with presets, interactive SVG plan, labeled range inputs, season selector, cost table, source disclosures. Tokens owned by style.css. Capacity math owned by capacity.mjs; geometry authored in scripts/build-master-scene.py and optimized for model.js.
 ## Accessibility
 Keyboard focus, semantic landmarks, native labels and controls, minimum 44px targets. SVG plan has descriptive title. WebGL canvas keyboard focus and visible controls plus text and SVG equivalents. No claim of certified physical accessibility; architect must review route, controls, clearances and applicable scoping. Respect reduced motion.
 ## Responsive behavior
@@ -24,7 +24,7 @@ Tour loading, ready and WebGL unavailable (show plan and imagery). Seasons chang
 ## Content voice
 Calm, specific, client-ready Mel voice. Recommendations marked as recommendations. Price quotes separate from authored allowances; cite primary sources. No promised rent uplift or ROI.
 ## Implementation constraints
-Buildless HTML/CSS/ES modules; dependency-free native WebGL. All imagery local. No CDN, external scripts, tracking, credentials or payment integrations. GitHub Pages is the canonical share URL; local preview and portable copy retained. Room envelope 24ft x22ft =528sqft illustrative; walls/utilities and building integration unresolved. AI perspective art is illustrative; Blender-rendered 360 viewpoints derive from model geometry; dimensional model/plan define schematic layout. No surveyed site context.
+Buildless HTML/CSS/ES modules; dependency-free native WebGL. All imagery local. No CDN, external scripts, tracking, credentials or payment integrations. GitHub Pages is the canonical share URL; local preview and portable copy retained. Room envelope 24ft x22ft =528sqft illustrative; walls/utilities and building integration unresolved. All current perspective, panorama and spatial-model views derive from one detailed Blender master scene; no AI perspective image is used in the current release. Browser geometry is optimized from that master. Dimensions and placement remain conceptual. No surveyed site context.
 ## Open questions
 - [ ] Developer/architect: final floorplate, frontage, exit routes, adjacency, structural/MEP and fire protection.
 - [ ] Operator: dog policy, demand, hours/noise controls, booking and towel-laundry model.
@@ -33,3 +33,6 @@ Buildless HTML/CSS/ES modules; dependency-free native WebGL. All imagery local. 
 
 ## Release update, October 29
 Integrated-wash/dry reference: Evolution mini, starting $12,250 each; supplier final submittals and free-use setup required. Default cycle 45min =15 wash+20 dry+10 arrival/reset (assumptions). Stress45min needs3bays; stress60min needs4 at chosen80% ceiling. Equipment allowance30–42k, total121.2–218.4k incl20% concept contingency. Public social card1200x630 with absolute OG/Twitter/canonical metadata. Mobile touch controls and genuine rendered panoramas; no claim that Unreal is used.
+
+## Presentation refinement, Concept 03
+Preserve brand, responsive shell, GitHub repository and URL. Upgrade one master architectural scene and derive every view from it. Lead with a concise recommendation and one Start tour action. Guided three-stop tour uses loaded-image crossfades, touch drag/pinch and reduced-motion support. Detailed model, calculator and specifications are progressive disclosures. Compare a compact20x18ft/360sqft concept with premium24x22ft/528sqft; both retain2integratedbays+1pawrinse, premium reservesfuturethird. Published equipment pair price24,500 is distinguished from unquoted construction allowance; compact construction remains quote-required. COST-EVIDENCE.json and PROCUREMENT-BRIEF.md record commercial evidence and a bid-ready scope. No vendor messages are authorized or sent.

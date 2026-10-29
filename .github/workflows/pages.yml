@@ -23,6 +23,7 @@ jobs:
           node --check app.mjs
           node --check model.js
           node --check panorama.js
+          node --check master-loader.mjs
           node capacity.test.mjs
       - name: Package the static release
         run: python3 scripts/package-site.py

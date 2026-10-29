@@ -1,0 +1,489 @@
+{
+  "schema_version": "1.0",
+  "project": "The Companion Room | East Lansing pet spa",
+  "checked_date": "2026-10-29",
+  "currency": "USD",
+  "status": "Public equipment prices verified. Local construction, complete delivered equipment packages and operating costs remain unquoted.",
+  "contact_status": "No supplier or contractor was contacted; no quotation was requested, no form submitted and no purchase made.",
+  "price_type_definitions": {
+    "published_price": "Manufacturer public starting or listed price; no project-specific quote.",
+    "quote_required": "No verified project-specific price; null means unknown, never zero.",
+    "authored_allowance": "Concept author assumption; no independent local cost validation."
+  },
+  "calculation_rules": [
+    "Published equipment rows and allowance rows overlap; never sum all ledger rows.",
+    "Alternative equipment packages are excluded from the reference base calculation.",
+    "Premium total uses only the six premium_base_allowance_component cost ranges plus their separately listed 20 percent contingency.",
+    "Compact installation has no authored price range; do not scale the premium estimate by floor area.",
+    "The optional third bay and retail fit-out are excluded from the two-bay premium total."
+  ],
+  "options": [
+    {
+      "id": "compact",
+      "interior_dimensions_ft": [
+        20,
+        18
+      ],
+      "area_sqft": 360,
+      "wash_dry_bays": 2,
+      "paw_rinse_stations": 1,
+      "future_third_bay": "No reserved third bay in the compact brief; evaluate any expansion separately."
+    },
+    {
+      "id": "premium",
+      "interior_dimensions_ft": [
+        24,
+        22
+      ],
+      "area_sqft": 528,
+      "wash_dry_bays": 2,
+      "paw_rinse_stations": 1,
+      "future_third_bay": "Reserve space; itemize provisions separately. Third unit excluded from base bid."
+    }
+  ],
+  "verified_equipment_notes": {
+    "source": [
+      "evolution_product",
+      "evolution_manual"
+    ],
+    "nominal_dimensions_inches": {
+      "width": 66,
+      "height": 54,
+      "depth": 24
+    },
+    "recommended_operating_footprint_ft": [
+      7,
+      7
+    ],
+    "configuration": "Factory Free Mode, no resident charge; optional card-reader version is a different ordering configuration.",
+    "service_access": "Manual shows removable front and side panels and calls for adequate utility access. No numeric service-clearance schedule was verified.",
+    "source_discrepancies": [
+      "Manual summary dimensions are nominal; drawings show projections beyond cabinet depth. Obtain current overall installation drawing.",
+      "Manual text specifies a 1.5-inch sanitary connection while a drawing labels a 2-inch drain. Supplier and project engineer must reconcile.",
+      "Current product includes microbubble technology; the linked detailed manual is March 2024. Obtain current model-specific submittal."
+    ],
+    "design_status": "Reference equipment only. Final layout and accessibility need current supplier documents and project design-team coordination."
+  },
+  "premium_authored_allowance_snapshot": {
+    "subtotal": {
+      "low": 101000,
+      "high": 182000
+    },
+    "contingency_rate": 0.2,
+    "contingency": {
+      "low": 20200,
+      "high": 36400
+    },
+    "total": {
+      "low": 121200,
+      "high": 218400
+    },
+    "source": "local_concept",
+    "validation": "Arithmetic checked; market pricing and construction scope not validated.",
+    "exclusions": [
+      "Land",
+      "Base-building shell",
+      "Tax",
+      "Finance",
+      "Structural work",
+      "Major service relocation",
+      "Optional third installed bay",
+      "Optional retail/vending fit-out"
+    ],
+    "scope_to_reconcile": [
+      "Permits and fees",
+      "Fire protection",
+      "Base-building vs amenity MEP scope",
+      "Freight and rigging",
+      "Design responsibilities",
+      "Future-bay provisions"
+    ]
+  },
+  "sources": {
+    "evolution_product": {
+      "title": "Evolution mini series manufacturer product page",
+      "url": "https://evolutiondogwash.com/models-and-pricing/models/mini-series/",
+      "checked_date": "2026-10-29"
+    },
+    "evolution_manual": {
+      "title": "Evolution mini Owners/Operators Manual, March 2024 Rev. 4.1",
+      "url": "https://evolutiondogwash.com/wp-content/uploads/2024/03/mini-Owners-Manual-final-March-2024-R-4.1-.pdf",
+      "checked_date": "2026-10-29",
+      "version": "March 2024 Rev. 4.1, currently linked by manufacturer"
+    },
+    "groomers_best": {
+      "title": "Groomer's Best ADA Walk-Through Bathing Tub",
+      "url": "https://www.groomersbest.com/product/ada-walk-through-bathing-tub/",
+      "checked_date": "2026-10-29"
+    },
+    "all_paws": {
+      "title": "All Paws TUB - Amenity",
+      "url": "https://allpawspetwash.com/apw-option-c.html",
+      "checked_date": "2026-10-29"
+    },
+    "iclean": {
+      "title": "iClean Dog Wash XL",
+      "url": "https://icleandogwash.com/en/model/iclean-dog-wash-xl",
+      "checked_date": "2026-10-29"
+    },
+    "city": {
+      "title": "City of East Lansing Building Information",
+      "url": "https://www.cityofeastlansing.com/648/Building-Information",
+      "checked_date": "2026-10-29"
+    },
+    "local_concept": {
+      "title": "Existing concept investment table reviewed during this task",
+      "path": "index.html",
+      "section": "investment",
+      "checked_date": "2026-10-29",
+      "authority": "Authored planning assumptions; no supplier or contractor quotation"
+    }
+  },
+  "entries": [
+    {
+      "id": "reference_mini_pair",
+      "description": "Two Evolution mini integrated wash/dry units",
+      "source": "evolution_product",
+      "checked_date": "2026-10-29",
+      "type": "published_price",
+      "currency": "USD",
+      "unitPrice": 12250,
+      "quantity": 2,
+      "total": 24500,
+      "exclusions": [
+        "Tax",
+        "Freight and rigging",
+        "Installation",
+        "Room construction",
+        "Options",
+        "Paw-rinse station",
+        "Ongoing consumables and service"
+      ],
+      "currentcommercialscope": "Manufacturer starting equipment price. Current page lists dryer, metered products, disinfectant, microbubble technology and filtration. Factory Free Mode is documented in the linked manual.",
+      "role": "reference_equipment_only",
+      "included_in_base_allowance": true,
+      "warranty": "10 years on frame/tub and 3 years on parts; manufacturer-supplied soaps/products required to maintain factory warranty.",
+      "additional_sources": [
+        "evolution_manual"
+      ]
+    },
+    {
+      "id": "component_tub_pair",
+      "description": "Two Groomer's Best 58-inch ADA walk-through tubs",
+      "source": "groomers_best",
+      "checked_date": "2026-10-29",
+      "type": "published_price",
+      "currency": "USD",
+      "unitPrice": 3246,
+      "quantity": 2,
+      "total": 6492,
+      "exclusions": [
+        "Plumbing kit",
+        "Floor grates",
+        "Separate dryer",
+        "Metering and product dispensing",
+        "Microbubble equipment",
+        "Installation",
+        "Tax",
+        "Any applicable freight surcharge",
+        "Room construction"
+      ],
+      "currentcommercialscope": "Component-only benchmark for commercial/multifamily use; includes basin, legs, sliding ramp, door, levelers and hole plug. This package has no documented integrated dryer or metered products.",
+      "role": "alternative_component_benchmark",
+      "included_in_base_allowance": false,
+      "warranty": "Manufacturer lists a 3-year warranty; obtain written scope and commercial-use terms with quotation.",
+      "comparability": "Not a like-for-like alternative to the integrated mini package."
+    },
+    {
+      "id": "apw_alternative_pair",
+      "description": "Two All Paws TUB - Amenity units",
+      "source": "all_paws",
+      "checked_date": "2026-10-29",
+      "type": "quote_required",
+      "currency": "USD",
+      "unitPrice": null,
+      "quantity": 2,
+      "total": null,
+      "exclusions": [
+        "Exact package inclusions, freight, tax, installation and warranty need supplier confirmation"
+      ],
+      "currentcommercialscope": "Free resident amenity model with rinse and integrated dryer controls, hair-straining system and management/resident-supplied soap. No current public model price verified.",
+      "role": "alternative_complete_system",
+      "included_in_base_allowance": false,
+      "warranty": "Written commercial warranty, local service and supply conditions required."
+    },
+    {
+      "id": "iclean_alternative_pair",
+      "description": "Two iClean XL units, control variant to be selected",
+      "source": "iclean",
+      "checked_date": "2026-10-29",
+      "type": "quote_required",
+      "currency": "USD",
+      "unitPrice": null,
+      "quantity": 2,
+      "total": null,
+      "exclusions": [
+        "Exact control variant, options, freight, tax, installation and warranty need supplier confirmation"
+      ],
+      "currentcommercialscope": "Larger integrated alternative; 93.5-inch length, 27.5-inch depth and 78.7-inch height overall on current model page. Control variants and optional equipment change scope.",
+      "role": "alternative_complete_system",
+      "included_in_base_allowance": false,
+      "warranty": "Written US commercial warranty and service coverage required."
+    },
+    {
+      "id": "equipment_allowance",
+      "description": "Integrated wash/dry plus paw-rinse equipment",
+      "source": "local_concept",
+      "checked_date": "2026-10-29",
+      "type": "authored_allowance",
+      "currency": "USD",
+      "unitPrice": null,
+      "quantity": 1,
+      "total": null,
+      "exclusions": [
+        "Scope allocation, tax and installed package to be reconciled in bids"
+      ],
+      "currentcommercialscope": "Existing 528-square-foot concept allowance, authored before site drawings or local contractor bids; retained for traceability.",
+      "role": "premium_base_allowance_component",
+      "included_in_base_allowance": true,
+      "range": {
+        "low": 30000,
+        "high": 42000
+      },
+      "estimate_author": "Concept author; not a contractor",
+      "quoted": false
+    },
+    {
+      "id": "plumbing_allowance",
+      "description": "Plumbing, drainage and waterproofing",
+      "source": "local_concept",
+      "checked_date": "2026-10-29",
+      "type": "authored_allowance",
+      "currency": "USD",
+      "unitPrice": null,
+      "quantity": 1,
+      "total": null,
+      "exclusions": [
+        "Scope allocation, tax and installed package to be reconciled in bids"
+      ],
+      "currentcommercialscope": "Existing 528-square-foot concept allowance, authored before site drawings or local contractor bids; retained for traceability.",
+      "role": "premium_base_allowance_component",
+      "included_in_base_allowance": true,
+      "range": {
+        "low": 20000,
+        "high": 40000
+      },
+      "estimate_author": "Concept author; not a contractor",
+      "quoted": false
+    },
+    {
+      "id": "finishes_allowance",
+      "description": "Finishes and partitions",
+      "source": "local_concept",
+      "checked_date": "2026-10-29",
+      "type": "authored_allowance",
+      "currency": "USD",
+      "unitPrice": null,
+      "quantity": 1,
+      "total": null,
+      "exclusions": [
+        "Scope allocation, tax and installed package to be reconciled in bids"
+      ],
+      "currentcommercialscope": "Existing 528-square-foot concept allowance, authored before site drawings or local contractor bids; retained for traceability.",
+      "role": "premium_base_allowance_component",
+      "included_in_base_allowance": true,
+      "range": {
+        "low": 25000,
+        "high": 45000
+      },
+      "estimate_author": "Concept author; not a contractor",
+      "quoted": false
+    },
+    {
+      "id": "mep_acoustics_allowance",
+      "description": "Electrical, ventilation and acoustic work",
+      "source": "local_concept",
+      "checked_date": "2026-10-29",
+      "type": "authored_allowance",
+      "currency": "USD",
+      "unitPrice": null,
+      "quantity": 1,
+      "total": null,
+      "exclusions": [
+        "Scope allocation, tax and installed package to be reconciled in bids"
+      ],
+      "currentcommercialscope": "Existing 528-square-foot concept allowance, authored before site drawings or local contractor bids; retained for traceability.",
+      "role": "premium_base_allowance_component",
+      "included_in_base_allowance": true,
+      "range": {
+        "low": 10000,
+        "high": 22000
+      },
+      "estimate_author": "Concept author; not a contractor",
+      "quoted": false
+    },
+    {
+      "id": "cabinetry_allowance",
+      "description": "Cabinetry, storage and accessories",
+      "source": "local_concept",
+      "checked_date": "2026-10-29",
+      "type": "authored_allowance",
+      "currency": "USD",
+      "unitPrice": null,
+      "quantity": 1,
+      "total": null,
+      "exclusions": [
+        "Scope allocation, tax and installed package to be reconciled in bids"
+      ],
+      "currentcommercialscope": "Existing 528-square-foot concept allowance, authored before site drawings or local contractor bids; retained for traceability.",
+      "role": "premium_base_allowance_component",
+      "included_in_base_allowance": true,
+      "range": {
+        "low": 8000,
+        "high": 18000
+      },
+      "estimate_author": "Concept author; not a contractor",
+      "quoted": false
+    },
+    {
+      "id": "design_allowance",
+      "description": "Design and commissioning",
+      "source": "local_concept",
+      "checked_date": "2026-10-29",
+      "type": "authored_allowance",
+      "currency": "USD",
+      "unitPrice": null,
+      "quantity": 1,
+      "total": null,
+      "exclusions": [
+        "Scope allocation, tax and installed package to be reconciled in bids"
+      ],
+      "currentcommercialscope": "Existing 528-square-foot concept allowance, authored before site drawings or local contractor bids; retained for traceability.",
+      "role": "premium_base_allowance_component",
+      "included_in_base_allowance": true,
+      "range": {
+        "low": 8000,
+        "high": 15000
+      },
+      "estimate_author": "Concept author; not a contractor",
+      "quoted": false
+    },
+    {
+      "id": "premium_contingency",
+      "description": "20 percent concept contingency",
+      "source": "local_concept",
+      "checked_date": "2026-10-29",
+      "type": "authored_allowance",
+      "currency": "USD",
+      "unitPrice": null,
+      "quantity": 1,
+      "total": null,
+      "exclusions": [],
+      "currentcommercialscope": "Calculated on the six existing premium allowance rows, not on published-price or alternative rows.",
+      "role": "premium_base_allowance_component",
+      "included_in_base_allowance": true,
+      "range": {
+        "low": 20200,
+        "high": 36400
+      },
+      "rate": 0.2,
+      "quoted": false
+    },
+    {
+      "id": "third_bay_optional",
+      "description": "Optional future third bay, installed",
+      "source": "local_concept",
+      "checked_date": "2026-10-29",
+      "type": "authored_allowance",
+      "currency": "USD",
+      "unitPrice": null,
+      "quantity": 1,
+      "total": null,
+      "exclusions": [
+        "Base two-bay total; future supply changes or service upgrades may affect scope"
+      ],
+      "currentcommercialscope": "Existing authored installed allowance; supplier and mechanical/electrical/plumbing scope remain unquoted.",
+      "role": "optional_add_alternate",
+      "included_in_base_allowance": false,
+      "range": {
+        "low": 18000,
+        "high": 30000
+      },
+      "quoted": false
+    },
+    {
+      "id": "retail_optional",
+      "description": "Optional retail/vending fit-out",
+      "source": "local_concept",
+      "checked_date": "2026-10-29",
+      "type": "authored_allowance",
+      "currency": "USD",
+      "unitPrice": null,
+      "quantity": 1,
+      "total": null,
+      "exclusions": [
+        "Base two-bay total",
+        "Stocking, payment fees and ongoing servicing"
+      ],
+      "currentcommercialscope": "Existing authored allowance; equipment and operator have not been selected.",
+      "role": "optional_add_alternate",
+      "included_in_base_allowance": false,
+      "range": {
+        "low": 3000,
+        "high": 8000
+      },
+      "quoted": false
+    },
+    {
+      "id": "compact_installed_bid",
+      "description": "Compact 20 by 18 foot option, complete installed scope",
+      "source": "local_concept",
+      "checked_date": "2026-10-29",
+      "type": "quote_required",
+      "currency": "USD",
+      "unitPrice": null,
+      "quantity": 1,
+      "total": null,
+      "exclusions": [
+        "To be expressly itemized by bidder"
+      ],
+      "currentcommercialscope": "360 square feet, two integrated wash/dry bays plus one paw-rinse station. No installed price or local quotation exists in this project record.",
+      "role": "required_local_bid",
+      "included_in_base_allowance": false,
+      "area_sqft": 360
+    },
+    {
+      "id": "premium_installed_bid",
+      "description": "Premium 24 by 22 foot option, complete installed scope",
+      "source": "local_concept",
+      "checked_date": "2026-10-29",
+      "type": "quote_required",
+      "currency": "USD",
+      "unitPrice": null,
+      "quantity": 1,
+      "total": null,
+      "exclusions": [
+        "To be expressly itemized by bidder"
+      ],
+      "currentcommercialscope": "528 square feet, two integrated wash/dry bays plus one paw-rinse station; reserve third-bay area and price future provisions explicitly. No local quotation exists in this project record.",
+      "role": "required_local_bid",
+      "included_in_base_allowance": false,
+      "area_sqft": 528
+    },
+    {
+      "id": "permits_review",
+      "description": "Project-specific permits and plan review",
+      "source": "city",
+      "checked_date": "2026-10-29",
+      "type": "quote_required",
+      "currency": "USD",
+      "unitPrice": null,
+      "quantity": 1,
+      "total": null,
+      "exclusions": [],
+      "currentcommercialscope": "City publishes building, plumbing, electrical and mechanical permit pathways. Applicability, fees and responsibility require coordination with the actual building team; no pet-spa-specific code conclusion is made.",
+      "role": "scope_reconciliation",
+      "included_in_base_allowance": false
+    }
+  ]
+}

@@ -167,6 +167,10 @@ export function createSpaViewer(canvas, options = {}) {
   plant(3.05,-1.9);
   group='future';tub(2.7,-2.5,1.48);
   group='all';
+  const scenePoints=options.geometry?.vertices||points;
+  const sceneItems=options.geometry?.items||items;
+  canvas.dataset.vertexCount=String(scenePoints.length/11);
+  canvas.dataset.drawGroups=String(sceneItems.length);
   const vs = `#version 300 es
   precision highp float; layout(location=0) in vec3 aPosition; layout(location=1) in vec3 aNormal; layout(location=2) in vec3 aColor; layout(location=3) in float aRough; layout(location=4) in float aKind;
   uniform mat4 uVP;uniform mat4 uLight;out vec3 vWorld;out vec3 vNormal;out vec3 vColor;out float vRough;out float vKind;out vec4 vShadow;
@@ -174,14 +178,14 @@ export function createSpaViewer(canvas, options = {}) {
   const fs = `#version 300 es
   precision highp float;in vec3 vWorld;in vec3 vNormal;in vec3 vColor;in float vRough;in float vKind;in vec4 vShadow;uniform vec3 uEye;uniform vec3 uSky;uniform sampler2D uDepth;uniform bool uShadows;out vec4 frag;
   void main(){vec3 n=normalize(vNormal);vec3 base=vColor;
-    if(vKind>.5&&vKind<1.5){vec2 grid=abs(fract((vWorld.xz+vec2(3.6576,3.3528))/.61)-.5);float seam=smoothstep(.482,.497,max(grid.x,grid.y));base*=mix(1.,.76,seam);base*=.99+.018*sin(vWorld.x*32.+sin(vWorld.z*29.));}
+    if(vKind>.5&&vKind<1.5){base*=.99+.012*sin(vWorld.x*12.+sin(vWorld.z*9.));}
     if(vKind>1.5&&vKind<2.5){base*=.94+.055*sin(vWorld.x*75.+sin(vWorld.y*3.)+vWorld.z*4.);}
     vec3 l=normalize(vec3(-3.,8.,5.));float diffuse=max(dot(n,l),0.);float shadow=0.;vec3 p=vShadow.xyz/vShadow.w*.5+.5;
     if(uShadows&&p.x>0.&&p.x<1.&&p.y>0.&&p.y<1.&&p.z<1.){float bias=max(.0015*(1.-dot(n,l)),.00065);for(int x=-1;x<=1;x++)for(int y=-1;y<=1;y++){float d=texture(uDepth,p.xy+vec2(x,y)/1536.).r;shadow+=p.z-bias>d?1.:0.;}shadow/=9.;}
-    float hemi=.52+.13*n.y;vec3 light=vec3(hemi)+vec3(.54,.49,.4)*diffuse*(1.-shadow*.65);
+    float hemi=.40+.17*n.y;vec3 light=vec3(hemi*.97,hemi,hemi*.96)+vec3(.59,.52,.41)*diffuse*(1.-shadow*.72);
     float contact=clamp(vWorld.y/.19,0.,1.);light*=mix(.86,1.,contact);
     vec3 h=normalize(l+normalize(uEye-vWorld));float spec=pow(max(dot(n,h),0.),mix(90.,8.,vRough))*(1.-vRough)*.5*(1.-shadow*.6);
-    vec3 c=base*light+vec3(spec);if(vKind>3.5&&vKind<4.5)c=mix(c,uSky,.65);if(vKind>4.5)c=base*1.25;
+    float fresnel=pow(1.-max(dot(n,normalize(uEye-vWorld)),0.),5.);vec3 c=base*light+vec3(spec)+vec3(.16,.17,.16)*fresnel*(1.-vRough);if(vKind>3.5&&vKind<4.5)c=mix(c,uSky,.65);if(vKind>4.5)c=base*1.25;
     c=mix(c,vec3(.91,.91,.86),clamp(length(uEye-vWorld)/65.,0.,.14));frag=vec4(pow(c,vec3(.94)),1.);}`;
   function shader(type,source){const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));return s;}
   const resources=[];
@@ -189,7 +193,7 @@ export function createSpaViewer(canvas, options = {}) {
   let main,depthProgram;
   try {main=program(vs,fs);depthProgram=program(`#version 300 es\nprecision highp float;layout(location=0) in vec3 aPosition;uniform mat4 uVP;void main(){gl_Position=uVP*vec4(aPosition,1.);}`,`#version 300 es\nprecision highp float;out vec4 frag;void main(){frag=vec4(1.);}`);} catch(error){options.onError?.(error);throw error;}
   const vao=gl.createVertexArray();gl.bindVertexArray(vao);resources.push(['vertexArray',vao]);
-  const buffer=gl.createBuffer();resources.push(['buffer',buffer]);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(points),gl.STATIC_DRAW);
+  const buffer=gl.createBuffer();resources.push(['buffer',buffer]);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(scenePoints),gl.STATIC_DRAW);
   for(const [loc,size,offset] of [[0,3,0],[1,3,3],[2,3,6],[3,1,9],[4,1,10]]){gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,size,gl.FLOAT,false,44,offset*4);}
   const depth=gl.createTexture();resources.push(['texture',depth]);gl.bindTexture(gl.TEXTURE_2D,depth);gl.texImage2D(gl.TEXTURE_2D,0,gl.DEPTH_COMPONENT24,1536,1536,0,gl.DEPTH_COMPONENT,gl.UNSIGNED_INT,null);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
   const fbo=gl.createFramebuffer();resources.push(['framebuffer',fbo]);gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.TEXTURE_2D,depth,0);gl.drawBuffers([gl.NONE]);gl.readBuffer(gl.NONE);const shadows=gl.checkFramebufferStatus(gl.FRAMEBUFFER)===gl.FRAMEBUFFER_COMPLETE;gl.bindFramebuffer(gl.FRAMEBUFFER,null);
@@ -197,7 +201,7 @@ export function createSpaViewer(canvas, options = {}) {
   const depthVP=gl.getUniformLocation(depthProgram,'uVP');
   const lightVP=multiply(ortho(-6.8,6.8,-6.8,6.8,.1,30),lookAt([-5,11,7],[0,0,0]));
   function visible(item){return !(item.group==='future'&&!future||item.group==='flex'&&future||item.group==='right'&&(view==='overview'||view==='plan')||item.group==='interior'&&(view==='overview'||view==='plan'));}
-  function drawItems(){for(const item of items)if(visible(item))gl.drawArrays(gl.TRIANGLES,item.start,item.count);}
+  function drawItems(){for(const item of sceneItems)if(visible(item))gl.drawArrays(gl.TRIANGLES,item.start,item.count);}
   function camera(){const aspect=canvas.width/canvas.height;if(view==='overview'){const distance=radius*Math.max(1,1.25/aspect);const e=[Math.sin(yaw)*Math.cos(pitch)*distance,Math.sin(pitch)*distance,Math.cos(yaw)*Math.cos(pitch)*distance];return {e,mat:multiply(perspective(.72,aspect,.1,60),lookAt(e,target))};}if(view==='plan'){const span=4.6;const w=aspect>=1?span*aspect:span;const h=aspect>=1?span:span/aspect;return {e:[0,12,0],mat:multiply(ortho(-w,w,-h,h,.1,40),lookAt([0,12,0],[0,0,0],[0,0,-1]))};}const dir=[Math.sin(heading)*Math.cos(tilt),Math.sin(tilt),-Math.cos(heading)*Math.cos(tilt)];return {e:eye,mat:multiply(perspective(1.12,aspect,.06,40),lookAt(eye,add(eye,dir)))};}
   function render(){frame=0;if(disposed)return;const rect=canvas.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,2),w=Math.max(1,Math.round(rect.width*dpr)),h=Math.max(1,Math.round(rect.height*dpr));if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}gl.enable(gl.DEPTH_TEST);gl.disable(gl.CULL_FACE);gl.bindVertexArray(vao);
     if(shadows){gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);gl.viewport(0,0,1536,1536);gl.clear(gl.DEPTH_BUFFER_BIT);gl.useProgram(depthProgram);gl.uniformMatrix4fv(depthVP,false,lightVP);drawItems();gl.bindFramebuffer(gl.FRAMEBUFFER,null);}
@@ -229,7 +233,7 @@ export function createSpaViewer(canvas, options = {}) {
     setSeason(name){if(['winter','spring','summer','fall'].includes(name)){season=name;schedule();}},
     setFutureBay(enabled){future=Boolean(enabled);schedule();},
     resize:schedule,
-    exportScene(){return {vertices:points.slice(),items:items.map(item=>({...item}))};},
+    exportScene(){return {vertices:Array.from(scenePoints),items:sceneItems.map(item=>({...item}))};},
     capture(){if(disposed)return null;render();return canvas.toDataURL('image/png');},
     destroy(){disposed=true;if(frame)cancelAnimationFrame(frame);observer.disconnect();removers.forEach(fn=>fn());canvas.style.touchAction=oldTouch;for(const [type,value] of resources){const method={program:'deleteProgram',buffer:'deleteBuffer',texture:'deleteTexture',framebuffer:'deleteFramebuffer',vertexArray:'deleteVertexArray'}[type];gl[method](value);}canvas.dataset.ready='false';}
   };

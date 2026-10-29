@@ -2,7 +2,7 @@
 export function createPanoramaViewer(canvas, options = {}) {
   const assets = { entrance: 'assets/panorama-entrance.jpg', wash: 'assets/panorama-wash.jpg', dry: 'assets/panorama-dry.jpg', ...options.assets };
   const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, preserveDrawingBuffer: true });
-  const noop = { setView() {}, zoom() {}, resize() {}, capture: () => null, destroy() {} };
+  const noop = { setView() {}, zoom() {}, resize() {}, getState: () => ({ view: null, yaw: 0, pitch: 0, fov: 75 }), capture: () => null, destroy() {} };
   canvas.dataset.panoReady = 'false';
   if (!gl) {
     options.onError?.(new Error('The panoramic tour needs WebGL 2. Please use the still renderings.'));
@@ -12,7 +12,8 @@ export function createPanoramaViewer(canvas, options = {}) {
   const radians = Math.PI / 180;
   const removers = [];
   let disposed = false, lost = false, readyNotified = false, frame = 0, request = 0, pending = null;
-  let program, vao, texture = null, uniforms, view = null, requestedView = 'entrance';
+  let program, vao, texture = null, transition = null, uniforms, view = null, requestedView = 'entrance';
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let yaw = 0, pitch = 0, fov = 75, targetYaw = 0, targetPitch = 0, targetFov = 75;
   const pointers = new Map();
   let pinchDistance = 0;
@@ -47,15 +48,21 @@ export function createPanoramaViewer(canvas, options = {}) {
       precision highp float;
       in vec2 screen;
       out vec4 color;
-      uniform sampler2D panorama;
+      uniform sampler2D panorama, previousPanorama;
+      uniform float blend;
+      uniform vec3 previousLook;
       uniform float aspect, tangent, yaw, pitch;
       const float PI = 3.141592653589793;
+      vec2 project(float heading, float elevation, float scale) {
+        vec3 ray = normalize(vec3(screen.x * aspect * scale, screen.y * scale, 1.0));
+        ray = vec3(ray.x, cos(elevation)*ray.y + sin(elevation)*ray.z, -sin(elevation)*ray.y + cos(elevation)*ray.z);
+        ray = vec3(cos(heading)*ray.x + sin(heading)*ray.z, ray.y, -sin(heading)*ray.x + cos(heading)*ray.z);
+        return vec2(0.5 + atan(ray.x, ray.z)/(2.0*PI), 0.5 - asin(clamp(ray.y,-1.0,1.0))/PI);
+      }
       void main() {
-        vec3 ray = normalize(vec3(screen.x * aspect * tangent, screen.y * tangent, 1.0));
-        ray = vec3(ray.x, cos(pitch)*ray.y + sin(pitch)*ray.z, -sin(pitch)*ray.y + cos(pitch)*ray.z);
-        ray = vec3(cos(yaw)*ray.x + sin(yaw)*ray.z, ray.y, -sin(yaw)*ray.x + cos(yaw)*ray.z);
-        vec2 uv = vec2(0.5 + atan(ray.x, ray.z)/(2.0*PI), 0.5 - asin(clamp(ray.y,-1.0,1.0))/PI);
-        color = texture(panorama, uv);
+        vec4 current = texture(panorama, project(yaw, pitch, tangent));
+        vec4 previous = texture(previousPanorama, project(previousLook.x, previousLook.y, previousLook.z));
+        color = mix(previous, current, blend);
       }`);
     program = gl.createProgram();
     gl.attachShader(program, vertex);
@@ -65,7 +72,7 @@ export function createPanoramaViewer(canvas, options = {}) {
     gl.deleteShader(fragment);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program) || 'Panorama program linking failed.');
     vao = gl.createVertexArray();
-    uniforms = Object.fromEntries(['aspect', 'tangent', 'yaw', 'pitch', 'panorama'].map(name => [name, gl.getUniformLocation(program, name)]));
+    uniforms = Object.fromEntries(['aspect', 'tangent', 'yaw', 'pitch', 'panorama', 'previousPanorama', 'previousLook', 'blend'].map(name => [name, gl.getUniformLocation(program, name)]));
   }
   function render() {
     if (disposed || lost || !texture || !canvas.clientWidth || !canvas.clientHeight) return;
@@ -75,8 +82,15 @@ export function createPanoramaViewer(canvas, options = {}) {
     gl.useProgram(program);
     gl.bindVertexArray(vao);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.bindTexture(gl.TEXTURE_2D, transition?.texture || texture);
     gl.uniform1i(uniforms.panorama, 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.uniform1i(uniforms.previousPanorama, 1);
+    const oldLook = transition?.previous || { yaw, pitch, fov };
+    gl.uniform3f(uniforms.previousLook, oldLook.yaw, oldLook.pitch, Math.tan(oldLook.fov*radians/2));
+    const amount = transition ? clamp((performance.now()-transition.start)/450, 0, 1) : 1;
+    gl.uniform1f(uniforms.blend, amount*amount*(3-2*amount));
     gl.uniform1f(uniforms.aspect, canvas.width / canvas.height);
     gl.uniform1f(uniforms.tangent, Math.tan(fov * radians / 2));
     gl.uniform1f(uniforms.yaw, yaw);
@@ -89,8 +103,9 @@ export function createPanoramaViewer(canvas, options = {}) {
     yaw += (targetYaw - yaw) * .22;
     pitch += (targetPitch - pitch) * .22;
     fov += (targetFov - fov) * .22;
+    if (transition && (reducedMotion.matches || performance.now()-transition.start >= 450)) commitTransition();
     render();
-    if (Math.abs(targetYaw-yaw) + Math.abs(targetPitch-pitch) + Math.abs(targetFov-fov) > .0001) wake();
+    if (transition || Math.abs(targetYaw-yaw) + Math.abs(targetPitch-pitch) + Math.abs(targetFov-fov) > .0001) wake();
   }
   function wake() { if (!frame && !disposed && !lost) frame = requestAnimationFrame(animate); }
   function resize() {
@@ -107,6 +122,27 @@ export function createPanoramaViewer(canvas, options = {}) {
     pending.src = '';
     pending = null;
   }
+  function commitTransition() {
+    const completed = transition;
+    if (!completed) return;
+    transition = null;
+    if (texture) gl.deleteTexture(texture);
+    texture = completed.texture;
+    view = completed.view;
+    resize();
+    canvas.dataset.panoReady = 'true';
+    canvas.dataset.panoView = view;
+    if (!readyNotified) { readyNotified = true; options.onReady?.(); }
+    options.onViewChange?.(view);
+  }
+  function cancelTransition() {
+    if (!transition) return;
+    gl.deleteTexture(transition.texture);
+    ({ yaw, pitch, fov } = transition.previous);
+    targetYaw = yaw; targetPitch = pitch; targetFov = fov;
+    transition = null;
+    render();
+  }
   function setView(name) {
     if (disposed) return;
     const next = name === 'overview' || name === 'plan' ? 'entrance' : name;
@@ -118,6 +154,7 @@ export function createPanoramaViewer(canvas, options = {}) {
     const token = ++request;
     cancelLoad();
     if (lost) return;
+    cancelTransition();
     if (next === view && texture) { options.onViewChange?.(next); return; }
     const image = new Image();
     pending = image;
@@ -138,20 +175,14 @@ export function createPanoramaViewer(canvas, options = {}) {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
         if (gl.getError() !== gl.NO_ERROR) throw new Error('The device could not upload the panorama.');
-        const first = !readyNotified;
-        if (texture) gl.deleteTexture(texture);
-        texture = uploaded;
-        view = next;
-        yaw = targetYaw = next === 'dry' ? Math.PI / 2 : 0;
-        pitch = targetPitch = 0;
+        transition = { texture: uploaded, view: next, start: performance.now(), previous: { yaw, pitch, fov } };
+        yaw = targetYaw = next === 'dry' ? Math.PI / 3 : next === 'wash' ? -Math.PI / 6 : 0;
+        pitch = targetPitch = (next === 'dry' ? -10 : next === 'wash' ? -8 : -5)*radians;
         fov = targetFov = 75;
-        resize();
-        canvas.dataset.panoReady = 'true';
-        canvas.dataset.panoView = view;
-        if (first) { readyNotified = true; options.onReady?.(); }
-        options.onViewChange?.(view);
+        if (!texture || reducedMotion.matches) commitTransition();
+        else wake();
       } catch (error) {
-        if (uploaded && uploaded !== texture) gl.deleteTexture(uploaded);
+        if (uploaded && uploaded !== texture && uploaded !== transition?.texture) gl.deleteTexture(uploaded);
         options.onError?.(error);
       }
     };
@@ -225,6 +256,7 @@ export function createPanoramaViewer(canvas, options = {}) {
     cancelLoad();
     cancelAnimationFrame(frame); frame = 0;
     texture = null;
+    transition = null;
     canvas.dataset.panoReady = 'false';
     options.onError?.(new Error('The panoramic graphics context was interrupted. The tour will reload when graphics recover.'));
   });
@@ -248,6 +280,7 @@ export function createPanoramaViewer(canvas, options = {}) {
     pointers.clear();
     if (!lost) {
       if (texture) gl.deleteTexture(texture);
+      if (transition) gl.deleteTexture(transition.texture);
       if (program) gl.deleteProgram(program);
       if (vao) gl.deleteVertexArray(vao);
     }
@@ -256,7 +289,7 @@ export function createPanoramaViewer(canvas, options = {}) {
     canvas.dataset.panoReady = 'false';
   }
   try { setup(); resize(); setView('entrance'); } catch (error) { options.onError?.(error); }
-  return { setView, zoom, resize, capture() {
+  return { setView, zoom, resize, getState: () => ({ view, yaw, pitch, fov }), capture() {
     if (disposed || lost || !texture) return null;
     render();
     try { return canvas.toDataURL('image/png'); } catch (error) { options.onError?.(error); return null; }
